@@ -2,7 +2,7 @@
 A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/items?itemName=eamodio.gitlens][VS Code's GitLens plugin]].
 
 * TODO Blamer.el plans [0/9]
-- [ ] Get necessary information about current line under courser
+- [ ] Get necessary information about current line under cursor
 - [ ] Visualize information in special format
 - [ ] blamer-mode implementation
 - [ ] Projectile git support
