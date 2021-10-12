@@ -109,7 +109,7 @@
     (if error
         (ignore)
       (progn
-        (message "Me: %s" blame-cmd-res)
+        ;; (message "Me: %s" blame-cmd-res)
         (string-match
          (concat "\\(?1:^[a-z0-9]+\\) \(\\(?2:[^\n]+\\)"
                  " \\(?3:[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\) "
