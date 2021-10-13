@@ -32,24 +32,45 @@
   "Show commit info at the end of a current line."
   :group 'tools)
 
+(defcustom blamer--prefix "   ◉ "
+  "String inserted before commit info."
+  :group 'blamer
+  :type 'string)
+
 (defcustom blamer--time-enabled-p t
   "Show time of commit"
   :group 'blamer
-  :type 'bool)
+  :type 'boolean)
+
+(defcustom blamer--commit-message-enabled-p t
+  "Show commit message whether this flat is t."
+  :group 'blamer
+  :type 'boolean)
 
 (defcustom blamer--author-enabled-p t
   "Show time of commit"
   :group 'blamer
-  :type 'bool)
+  :type 'boolean)
 
 (defcustom blamer--idle-time 0.5
   "Seconds before commit info show"
   :group 'blamer
   :type 'float)
 
+(defcustom blamer--min-offset 20
+  "Minimum symbols before insert commit info"
+  :group 'blamer
+  :type 'integer)
+
+(defcustom blamer--max-commit-message-length 50
+  "Max length of commit message.
+Commit message with more characters will be truncated with ellipsis at the end"
+  :group 'blamer
+  :type 'integer)
+
 (defface blamer--face
   '((t :foreground "#7a88cf"
-       :background "#2f334d"
+       :background nil
        :italic t))
   "Face for blamer"
   :group 'blamer)
@@ -57,25 +78,24 @@
 ;; TODO: remove it after tests
 ;; (set-face-attribute 'blamer--face nil
 ;;    :foreground "#7a88cf"
-;;        :background "#2f334d"
+;;        :background nil
 ;;        :italic t)
 
 
-(defvar blamer--git-repo-cmd "git rev-parse --is-inside-work-tree")
-(defvar blamer--git-blame-cmd "git blame -L %s,%s %s")
-(defvar blamer--git-commit-message "git log -n1 %s")
+(defvar blamer--git-repo-cmd "git rev-parse --is-inside-work-tree"
+  "Command for detect git repo.")
+
+(defvar blamer--git-blame-cmd "git blame -L %s,%s %s"
+  "Command for get blame of current line.")
+
+(defvar blamer--git-commit-message "git log -n1 %s"
+  "Command for get commit message.")
+
 (defvar blamer--idle-timer nil
   "Current timer before commit info showing.")
+
 (defvar blamer--previous-line-number nil
   "Line number of previous popup.")
-
-(defun blamer--current-line-commit-info ()
-  "Return information about current line or nil if .git not found")
-
-(defun blamer--git-exist-p ()
-  "Return t if .git exist."
-  (let* ((git-exist-stdout (shell-command-to-string blamer--git-repo-cmd)))
-    (string-match "^true" git-exist-stdout)))
 
 (defvar blamer--current-overlay nil
   "Current overlay for git blame message.")
@@ -83,67 +103,123 @@
 (defvar blamer--current-point nil
   "Current overlay for git blame message.")
 
+;; TODO Add tests
+(defvar blamer--regexp-info
+  (concat "\\(?1:^[a-z0-9]+\\) [^\s]*[[:blank:]]?\(\\(?2:[^\n]+\\)"
+          "\s\\(?3:[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\)"
+          "\s\\(?4:[0-9]\\{2\\}:[0-9]\\{2\\}:[0-9]\\{2\\}\\)")
+
+  "Regexp for extract data from blame message.
+1 - commit hash
+2 - author
+3 - date
+3 - time")
+
+(defvar blamer--commit-message-regexp "\n\n[\s]+\\(?1:[^.]+\\):?"
+  "Regexp for commit message parsing.")
+
+(defun blamer--git-exist-p ()
+  "Return t if .git exist."
+  (let* ((git-exist-stdout (shell-command-to-string blamer--git-repo-cmd)))
+    (string-match "^true" git-exist-stdout)))
+
 (defun blamer--clear-overlay ()
   "Clear last overlay."
   (if blamer--current-overlay
       (delete-overlay blamer--current-overlay)))
 
+(defun blamer--git-cmd-error-p (cmd-res)
+  "Return t if CMD-RES contain error"
+  (string-match-p  "^fatal:" cmd-res))
+
+(defun blamer--prettify-time (date time)
+  "Prettify DATE and TIME for nice commit message"
+  ;; TODO: implement
+  (concat "[" date " " time "]"))
+
 (defun blamer--format-commit-info (commit-hash
-                                   not-commited-yet-p
-                                   &optional
+                                   commit-message
                                    author
                                    date
-                                   time)
-  "Format commit info into display message."
-  (format "   ◉ %s, %s (%s)" author (concat date " " time) commit-hash))
+                                   time
+                                   &optional offset)
+  "Format commit info into display message.
+COMMIT-HASH - hash of current commit.
+COMMIT-MESSAGE - message of current commit, can be null
+AUTHOR - name of commiter
+DATE - date in format YYYY-DD-MM
+TIME - time in format HH:MM:SS
+OFFSET - additional offset for commit message"
+
+  ;; TODO: add function for prettify current time
+  ;; (message "hash - %s\n commit-message - %s\n author - %s\n date - %s\n time - %s\n"
+  ;;          commit-hash commit-message author date time)
+  (concat (make-string (or offset 0) ? )
+          (or blamer--prefix "")
+          (if blamer--author-enabled-p (concat author " ") "")
+          (if blamer--time-enabled-p (concat (blamer--prettify-time date time) " ") "")
+          (if commit-message (format " (%s)" commit-message) "")))
+
+(defun blamer--get-commit-message (hash)
+  "Get commit message by provided HASH.
+Return nil if error."
+  (let* ((git-commit-res (shell-command-to-string (format blamer--git-commit-message hash)))
+         (has-error (blamer--git-cmd-error-p git-commit-res))
+         commit-message)
+
+    (if (not has-error)
+        (progn
+          (string-match blamer--commit-message-regexp git-commit-res)
+          (setq commit-message (match-string 1 git-commit-res))
+          (setq commit-message (replace-regexp-in-string "\n" " " commit-message))
+          (setq commit-message (string-trim commit-message))
+          (truncate-string-to-width commit-message blamer--max-commit-message-length nil nil "...")))))
 
 (defun blamer--render-current-line ()
   "Render text about current line commit status."
   (let* ((line-number (line-number-at-pos))
          (file-name (buffer-name))
          (cmd (format blamer--git-blame-cmd line-number line-number file-name))
+         (offset (or blamer--min-offset 0))
+         (offset (max (- offset (length (thing-at-point 'line))) 0))
          (blame-cmd-res (shell-command-to-string cmd))
          commit-message popup-message error commit-hash commit-author commit-date commit-time)
 
-    (setq error (string-match-p  "^fatal:" blame-cmd-res))
+    (setq error (blamer--git-cmd-error-p blame-cmd-res))
     (if error
         (ignore)
       (progn
-        ;; (message "Me: %s" blame-cmd-res)
-        (string-match
-         (concat "\\(?1:^[a-z0-9]+\\) \(\\(?2:[^\n]+\\)"
-                 " \\(?3:[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\) "
-                 "\\(?4:[0-9]\\{2\\}:[0-9]\\{2\\}:[0-9]\\{2\\}\\)")
-                 blame-cmd-res)
-         ;; TODO: commit hash get here
-         (setq commit-hash (match-string 1 blame-cmd-res))
-         (setq commit-author (match-string 2 blame-cmd-res))
-         (setq commit-date (match-string 3 blame-cmd-res))
-         (setq commit-time (match-string 4 blame-cmd-res))
+        ;; (message "%s" blame-cmd-res)
 
-         (setq commit-message (progn
-                                ;; TODO: commit message get here
-                                (string-match "^n" blame-cmd-res)))
-         (setq popup-message (blamer--format-commit-info commit-hash
-                                                         nil
-                                                         commit-author
-                                                         commit-date
-                                                         commit-time))
-         (setq popup-message (propertize popup-message 'face 'blamer--face 'cursor t)))
+        (string-match blamer--regexp-info blame-cmd-res)
+        (setq commit-hash (match-string 1 blame-cmd-res))
+        ;; (message "commit-hash %s" commit-hash)
 
-        (blamer--clear-overlay)
+        (setq commit-author (match-string 2 blame-cmd-res))
+        (setq commit-date (match-string 3 blame-cmd-res))
+        (setq commit-time (match-string 4 blame-cmd-res))
+        (setq commit-message (if blamer--commit-message-enabled-p
+                                 (blamer--get-commit-message commit-hash)))
+        (setq popup-message (blamer--format-commit-info commit-hash
+                                                        commit-message
+                                                        commit-author
+                                                        commit-date
+                                                        commit-time
+                                                        offset))
 
-        (setq blamer--current-overlay (make-overlay (line-end-position) (line-end-position) nil t t))
-        (overlay-put blamer--current-overlay 'after-string popup-message)
-        (overlay-put blamer--current-overlay 'intangible t)
-        (overlay-put blamer--current-overlay 'face 'bold)
-        (setq blamer--current-point (point)))))
+        (setq popup-message (propertize popup-message 'face 'blamer--face 'cursor t)))
+      (blamer--clear-overlay)
+      (setq blamer--current-overlay (make-overlay (line-end-position) (line-end-position) nil t t))
+      (overlay-put blamer--current-overlay 'after-string popup-message)
+      (overlay-put blamer--current-overlay 'intangible t)
+      (overlay-put blamer--current-overlay 'face 'bold)
+      (setq blamer--current-point (point)))))
 
 
 (defun blamer--render-commit-info-with-delay ()
   "Render commit info with delay."
   (setq blamer--idle-timer
-        (run-with-idle-timer blamer--idle-time nil 'blamer--render-current-line)))
+        (run-with-idle-timer (or blamer--idle-time 0) nil 'blamer--render-current-line)))
 
 (defun blamer--try-render-current-line ()
   "Render current line if is .git exist."

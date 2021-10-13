@@ -23,7 +23,7 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
   (setq blamer--idle-time 1))
   #+END_SRC
 
-* TODO Blamer.el plans [3/14]
+* TODO Blamer.el plans [5/14]
 - [X] Get necessary information about current line under cursor
 - [ ] Get commit info by current hash (if necessary) [#A]
 - [X] Visualize information in special format
@@ -31,9 +31,9 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 - [ ] +Projectile git support+
 - [ ] Flycheck support. Priority of flycheck should be highest then blamer
 - [ ] +IDLE time before showing+
-- [ ] Show git messages for all visible lines
-- [ ] Special font for blame.
-- [ ] Truncate long commit line
+- [ ] +Show git messages for all visible lines+
+- [X] Special font for blame.
+- [X] Truncate long commit line
 - [ ] Add pretty date format
 - [ ] Add support for common line number changed (might be deleted from external source, or evil keys)
 - [ ] Add support for global mode
