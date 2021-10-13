@@ -23,9 +23,10 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
   (setq blamer--idle-time 1))
   #+END_SRC
 
-* TODO Blamer.el plans [5/14]
+* TODO Blamer.el plans [6/15]
 - [X] Get necessary information about current line under cursor
-- [ ] Get commit info by current hash (if necessary) [#A]
+- [X] Get commit info by current hash (if necessary)
+- [ ] Get background color if hl-mode is exist and enabled (transparency)
 - [X] Visualize information in special format
 - [X] blamer-mode implementation
 - [ ] +Projectile git support+
