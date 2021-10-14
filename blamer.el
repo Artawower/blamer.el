@@ -97,10 +97,10 @@ Commit message with more characters will be truncated with ellipsis at the end"
 (defvar blamer--previous-line-number nil
   "Line number of previous popup.")
 
-(defvar blamer--current-overlay nil
-  "Current overlay for git blame message.")
+(defvar blamer--previous-line-length nil
+  "Current line number length for detect rerender function.")
 
-(defvar blamer--current-point nil
+(defvar blamer--current-overlay nil
   "Current overlay for git blame message.")
 
 ;; TODO Add tests
@@ -167,53 +167,46 @@ Return nil if error."
          (has-error (blamer--git-cmd-error-p git-commit-res))
          commit-message)
 
-    (if (not has-error)
-        (progn
-          (string-match blamer--commit-message-regexp git-commit-res)
-          (setq commit-message (match-string 1 git-commit-res))
-          (setq commit-message (replace-regexp-in-string "\n" " " commit-message))
-          (setq commit-message (string-trim commit-message))
-          (truncate-string-to-width commit-message blamer--max-commit-message-length nil nil "...")))))
+    (when (not has-error)
+      (string-match blamer--commit-message-regexp git-commit-res)
+      (setq commit-message (match-string 1 git-commit-res))
+      (setq commit-message (replace-regexp-in-string "\n" " " commit-message))
+      (setq commit-message (string-trim commit-message))
+      (truncate-string-to-width commit-message blamer--max-commit-message-length nil nil "..."))))
 
 (defun blamer--render-current-line ()
   "Render text about current line commit status."
   (let* ((line-number (line-number-at-pos))
-         (file-name (buffer-name))
+         (file-name (buffer-file-name))
          (cmd (format blamer--git-blame-cmd line-number line-number file-name))
          (offset (or blamer--min-offset 0))
          (offset (max (- offset (length (thing-at-point 'line))) 0))
          (blame-cmd-res (shell-command-to-string cmd))
          commit-message popup-message error commit-hash commit-author commit-date commit-time)
 
+    ;; (message "cmd %s: res %s" cmd blame-cmd-res)
     (setq error (blamer--git-cmd-error-p blame-cmd-res))
-    (if error
-        (ignore)
-      (progn
-        ;; (message "%s" blame-cmd-res)
+    (when (not error)
+      (string-match blamer--regexp-info blame-cmd-res)
+      (setq commit-hash (match-string 1 blame-cmd-res))
+      (setq commit-author (match-string 2 blame-cmd-res))
+      (setq commit-date (match-string 3 blame-cmd-res))
+      (setq commit-time (match-string 4 blame-cmd-res))
+      (setq commit-message (if blamer--commit-message-enabled-p
+                               (blamer--get-commit-message commit-hash)))
+      (setq popup-message (blamer--format-commit-info commit-hash
+                                                      commit-message
+                                                      commit-author
+                                                      commit-date
+                                                      commit-time
+                                                      offset))
+      (setq popup-message (propertize popup-message 'face 'blamer--face 'cursor t)))
 
-        (string-match blamer--regexp-info blame-cmd-res)
-        (setq commit-hash (match-string 1 blame-cmd-res))
-        ;; (message "commit-hash %s" commit-hash)
-
-        (setq commit-author (match-string 2 blame-cmd-res))
-        (setq commit-date (match-string 3 blame-cmd-res))
-        (setq commit-time (match-string 4 blame-cmd-res))
-        (setq commit-message (if blamer--commit-message-enabled-p
-                                 (blamer--get-commit-message commit-hash)))
-        (setq popup-message (blamer--format-commit-info commit-hash
-                                                        commit-message
-                                                        commit-author
-                                                        commit-date
-                                                        commit-time
-                                                        offset))
-
-        (setq popup-message (propertize popup-message 'face 'blamer--face 'cursor t)))
+    (when (and commit-author (not (eq commit-author "")))
       (blamer--clear-overlay)
       (setq blamer--current-overlay (make-overlay (line-end-position) (line-end-position) nil t t))
       (overlay-put blamer--current-overlay 'after-string popup-message)
-      (overlay-put blamer--current-overlay 'intangible t)
-      (overlay-put blamer--current-overlay 'face 'bold)
-      (setq blamer--current-point (point)))))
+      (overlay-put blamer--current-overlay 'intangible t))))
 
 
 (defun blamer--render-commit-info-with-delay ()
@@ -223,13 +216,14 @@ Return nil if error."
 
 (defun blamer--try-render-current-line ()
   "Render current line if is .git exist."
-  (if (and (or (not blamer--previous-line-number)
-               (not (eq blamer--previous-line-number (line-number-at-pos))))
-           (blamer--git-exist-p))
-      (progn
-        (blamer--clear-overlay)
-        (setq blamer--previous-line-number (line-number-at-pos))
-        (blamer--render-commit-info-with-delay))))
+  (when (and (or (not blamer--previous-line-number)
+                 (not (eq blamer--previous-line-number (line-number-at-pos)))
+                 (not (eq blamer--previous-line-length (length (thing-at-point 'line)))))
+             (blamer--git-exist-p))
+    (blamer--clear-overlay)
+    (setq blamer--previous-line-number (line-number-at-pos))
+    (setq blamer--previous-line-length (length (thing-at-point 'line)))
+    (blamer--render-commit-info-with-delay)))
 
 (defun blamer--reset-state ()
   "Reset all state after blamer mode is disabled."
@@ -252,9 +246,17 @@ will appear after BLAMER--IDLE-TIME. It works only inside git repo"
   :global nil
   :lighter nil
   :group 'blamer
-  (if blamer-mode
+  (if (and blamer-mode (buffer-file-name))
       (add-hook 'post-command-hook #'blamer--try-render-current-line nil t)
     (blamer--reset-state)))
+
+;;;###autoload
+(define-globalized-minor-mode
+  global-blamer-mode
+  blamer-mode
+  (lambda ()
+    (when (not blamer-mode)
+      (blamer-mode))))
 
 (provide 'blamer)
 ;;; blamer.el ends here
