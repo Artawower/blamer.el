@@ -23,13 +23,13 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
   (setq blamer--idle-time 1))
   #+END_SRC
 
-* TODO Blamer.el plans [8/17]
+* TODO Blamer.el plans [9/17]
 - [X] Get necessary information about current line under cursor
 - [X] Get commit info by current hash (if necessary)
-- [ ] Get background color if hl-mode is exist and enabled (transparency)
+- [X] Get background color if hl-mode is exist and enabled (transparency)
 - [X] Visualize information in special format
 - [X] blamer-mode implementation
-- [ ] Write tests for regexps
+- [ ] Write tests for regexps [#D]
 - [ ] +Projectile git support+
 - [ ] Flycheck support. Priority of flycheck should be highest then blamer
 - [ ] Should be blamer enabled on typing/inserting? [#E]
@@ -40,4 +40,4 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 - [ ] Add pretty date format
 - [X] Add support for common line number changed (might be deleted from external source, or evil keys)
 - [X] Add support for global mode
-- [ ] Add support for multi line selection
+- [ ] Add support for multi line selection [#D]

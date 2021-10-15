@@ -1,4 +1,4 @@
-;;; blamer.el --- show git blame info about current line           -*- lexical-binding: t; -*-
+;;; blamer.el --- Show git blame info about current line           -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2021 Artur Yaroshenko
 
@@ -62,6 +62,17 @@
   :group 'blamer
   :type 'integer)
 
+;; TODO: add type choice
+(defcustom blamer--type 'both
+  "Type of blamer.
+'visual - show blame only for current line
+'selected - show blame only for selected line
+'both - both of them"
+  :group 'blamer
+  :type '(choice (const :tag "Visual only" visual)
+                 (const :tag "Visual and selected" both)
+                 (const :tag "Selected only" selected)))
+
 (defcustom blamer--max-commit-message-length 50
   "Max length of commit message.
 Commit message with more characters will be truncated with ellipsis at the end"
@@ -71,16 +82,10 @@ Commit message with more characters will be truncated with ellipsis at the end"
 (defface blamer--face
   '((t :foreground "#7a88cf"
        :background nil
+       :height 120
        :italic t))
   "Face for blamer"
   :group 'blamer)
-
-;; TODO: remove it after tests
-;; (set-face-attribute 'blamer--face nil
-;;    :foreground "#7a88cf"
-;;        :background nil
-;;        :italic t)
-
 
 (defvar blamer--git-repo-cmd "git rev-parse --is-inside-work-tree"
   "Command for detect git repo.")
@@ -174,6 +179,14 @@ Return nil if error."
       (setq commit-message (string-trim commit-message))
       (truncate-string-to-width commit-message blamer--max-commit-message-length nil nil "..."))))
 
+(defun blamer--get-background-color ()
+  "Return color of background under current cursor position."
+  (let ((face (or (get-char-property (point) 'read-face-name)
+                  (get-char-property (point) 'face))))
+    (if hl-line-mode
+        (face-attribute 'hl-line :background)
+      (face-attribute face :background))))
+
 (defun blamer--render-current-line ()
   "Render text about current line commit status."
   (let* ((line-number (line-number-at-pos))
@@ -200,7 +213,9 @@ Return nil if error."
                                                       commit-date
                                                       commit-time
                                                       offset))
-      (setq popup-message (propertize popup-message 'face 'blamer--face 'cursor t)))
+      (setq popup-message (propertize popup-message
+                                      'face `(:inherit (blamer--face :background ,(blamer--get-background-color)))
+                                      'cursor t)))
 
     (when (and commit-author (not (eq commit-author "")))
       (blamer--clear-overlay)
