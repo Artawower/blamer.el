@@ -155,9 +155,6 @@ Commit message with more characters will be truncated with ellipsis at the end"
 
 (defun blamer--prettify-time (date time)
   "Prettify DATE and TIME for nice commit message"
-  ;; TODO: implement
-  ;; (message "%s" (parse-time-string (concat date "T" time)))
-  ;; (message "%s" (current-time))
   (let* ((parsed-time (parse-time-string (concat date "T" time)))
          (now (decode-time (current-time)))
          (month-diff (- (nth 4 now) (nth 4 parsed-time)))
@@ -173,9 +170,8 @@ Commit message with more characters will be truncated with ellipsis at the end"
                             (same-hour-p (format "%s minutes ago" minutes-diff))
                             ((and same-day-p (<= hours-diff 5)) (format "%s hours ago" hours-diff))
                             ;; TODO: add yesterday
-                            ((and same-year-and-month-p (<= days-diff 3)) (format  "%s days ago" days-diff))
                             (same-day-p (concat "Today " time))
-                            ;; ((and same-year-p (<= month-diff 1)) "P")
+                            ((and same-year-and-month-p (<= days-diff 3)) (format  "%s days ago" days-diff))
                             ((and (= month-diff 1) same-year-p) "Previous month")
                             ((and same-year-p (<= month-diff 3)) (format "%s month ago" month-diff))
                             (t (concat date " " time )))))
@@ -344,8 +340,6 @@ will appear after BLAMER--IDLE-TIME. It works only inside git repo"
   :lighter nil
   :group 'blamer
   (let ((is-git-repo (blamer--git-exist-p)))
-    ;; (message "is git repo %s" is-git-repo)
-
     (when (and blamer--author-enabled-p is-git-repo)
       (setq-local blamer--current-author (substring (shell-command-to-string blamer--git-author-cmd) 0 -1)))
 
