@@ -29,6 +29,32 @@
 (require 'subr-x)
 (require 'simple)
 
+(defconst blamer--regexp-info
+  (concat "\\(?1:^[a-z0-9]+\\) [^\s]*[[:blank:]]?\(\\(?2:[^\n]+\\)"
+          "\s\\(?3:[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\)"
+          "\s\\(?4:[0-9]\\{2\\}:[0-9]\\{2\\}:[0-9]\\{2\\}\\)")
+
+  "Regexp for extract data from blame message.
+1 - commit hash
+2 - author
+3 - date
+3 - time")
+
+(defconst blamer--commit-message-regexp "\n\n[\s]+\\(?1:[^.]+\\):?"
+  "Regexp for commit message parsing.")
+
+(defconst blamer--git-author-cmd "git config --get user.name"
+  "Command for getting current git user name")
+
+(defconst blamer--git-repo-cmd "git rev-parse --is-inside-work-tree"
+  "Command for detect git repo.")
+
+(defconst blamer--git-blame-cmd "git blame -L %s,%s %s"
+  "Command for get blame of current line.")
+
+(defconst blamer--git-commit-message "git log -n1 %s"
+  "Command for get commit message.")
+
 (defgroup blamer nil
   "Show commit info at the end of a current line."
   :group 'tools)
@@ -92,14 +118,6 @@ Commit message with more characters will be truncated with ellipsis at the end"
   "Face for blamer info."
   :group 'blamer)
 
-(defvar blamer--git-repo-cmd "git rev-parse --is-inside-work-tree"
-  "Command for detect git repo.")
-
-(defvar blamer--git-blame-cmd "git blame -L %s,%s %s"
-  "Command for get blame of current line.")
-
-(defvar blamer--git-commit-message "git log -n1 %s"
-  "Command for get commit message.")
 
 (defvar blamer--idle-timer nil
   "Current timer before commit info showing.")
@@ -115,22 +133,10 @@ Commit message with more characters will be truncated with ellipsis at the end"
 
 (defvar blamer--overlays '()
   "Current active overlays for git blame messages.")
-(defvar blamer--previous)
 
-;; TODO Add tests
-(defvar blamer--regexp-info
-  (concat "\\(?1:^[a-z0-9]+\\) [^\s]*[[:blank:]]?\(\\(?2:[^\n]+\\)"
-          "\s\\(?3:[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\)"
-          "\s\\(?4:[0-9]\\{2\\}:[0-9]\\{2\\}:[0-9]\\{2\\}\\)")
+(defvar-local blamer--current-author nil
+  "git.name for current repository.")
 
-  "Regexp for extract data from blame message.
-1 - commit hash
-2 - author
-3 - date
-3 - time")
-
-(defvar blamer--commit-message-regexp "\n\n[\s]+\\(?1:[^.]+\\):?"
-  "Regexp for commit message parsing.")
 
 (defun blamer--git-exist-p ()
   "Return t if .git exist."
@@ -172,10 +178,8 @@ Commit message with more characters will be truncated with ellipsis at the end"
                             ;; ((and same-year-p (<= month-diff 1)) "P")
                             ((and (= month-diff 1) same-year-p) "Previous month")
                             ((and same-year-p (<= month-diff 3)) (format "%s month ago" month-diff))
-                            (t (concat date " " time ))
-                            )))
-    (format "[%s]" pretty-date)
-    ))
+                            (t (concat date " " time )))))
+    (format "[%s]" pretty-date)))
 
 (defun blamer--format-commit-info (commit-hash
                                    commit-message
@@ -252,10 +256,10 @@ Return nil if error."
         (setq error (blamer--git-cmd-error-p cmd-msg))
         (when (not error)
           (setq offset (max (- (or blamer--min-offset 0) (length (thing-at-point 'line))) 0))
-
           (string-match blamer--regexp-info cmd-msg)
           (setq commit-hash (match-string 1 cmd-msg))
           (setq commit-author (match-string 2 cmd-msg))
+          (setq commit-author (if (string= commit-author blamer--current-author) "You" commit-author))
           (setq commit-date (match-string 3 cmd-msg))
           (setq commit-time (match-string 4 cmd-msg))
           (setq commit-message (if blamer--commit-message-enabled-p
@@ -306,9 +310,8 @@ Return nil if error."
                    (and (eq blamer--type 'selected) (use-region-p)))
                (or (not blamer--previous-line-number)
                    (not (eq blamer--previous-line-number (line-number-at-pos)))
-                   (not (eq blamer--previous-line-length (length (thing-at-point 'line)))))
-               ;; TODO: move this check to run local mode?
-               (blamer--git-exist-p))
+                   (not (eq blamer--previous-line-length (length (thing-at-point 'line))))))
+      ;; TODO: move this check to run local mode?)
 
       (blamer--clear-overlay)
       (setq blamer--previous-line-number (line-number-at-pos))
@@ -340,10 +343,16 @@ will appear after BLAMER--IDLE-TIME. It works only inside git repo"
   :global nil
   :lighter nil
   :group 'blamer
-  (if (and blamer-mode (buffer-file-name))
-      (progn
-        (add-hook 'post-command-hook #'blamer--try-render nil t))
-    (blamer--reset-state)))
+  (let ((is-git-repo (blamer--git-exist-p)))
+    ;; (message "is git repo %s" is-git-repo)
+
+    (when (and blamer--author-enabled-p is-git-repo)
+      (setq-local blamer--current-author (substring (shell-command-to-string blamer--git-author-cmd) 0 -1)))
+
+    (if (and blamer-mode (buffer-file-name) is-git-repo)
+        (progn
+          (add-hook 'post-command-hook #'blamer--try-render nil t))
+      (blamer--reset-state))))
 
 ;;;###autoload
 (define-globalized-minor-mode

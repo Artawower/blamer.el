@@ -1,3 +1,5 @@
+[[https://github.com/artawower/blamer.el/actions/workflows/lint.yml/badge.svg]]
+
 * Blamer.el
 A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/items?itemName=eamodio.gitlens][VS Code's GitLens plugin]].
 * Install
@@ -23,18 +25,19 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
   (setq blamer--idle-time 1))
   #+END_SRC
 
-* TODO Blamer.el plans [11/15]
+* TODO Blamer.el plans [13/15]
 - [X] Get necessary information about current line under cursor
 - [X] Get commit info by current hash (if necessary)
 - [X] Get background color if hl-mode is exist and enabled (transparency)
 - [X] Visualize information in special format
 - [X] blamer-mode implementation
 - [ ] Write tests for regexps [#B]
-- [ ] +Flycheck support. Priority of flycheck should be highest then blamer+
 - [X] IDLE time before showing
 - [X] Special font for blame.
 - [X] Truncate long commit line
-- [ ] Add pretty date format [#D]
+- [X] Add pretty date format
+- [X] Pretty author name
 - [X] Add support for common line number changed (might be deleted from external source, or evil keys)
 - [X] Add support for global mode
 - [X] Add support for multi line selection
+- [ ] Add async process call
