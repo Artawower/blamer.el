@@ -165,7 +165,7 @@ Commit message with more characters will be truncated with ellipsis at the end"
 
          (pretty-date (cond ((time-equal-p now parsed-time) "Now")
                             (same-hour-p (format "%s minutes ago" minutes-diff))
-                            ((and same-day-p (<= hours-diff 5)) (format "%s hours ago"))
+                            ((and same-day-p (<= hours-diff 5)) (format "%s hours ago" hours-diff))
                             ;; TODO: add yesterday
                             ((and same-year-and-month-p (<= days-diff 3)) (format  "%s days ago" days-diff))
                             (same-day-p (concat "Today " time))
