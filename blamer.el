@@ -150,7 +150,32 @@ Commit message with more characters will be truncated with ellipsis at the end"
 (defun blamer--prettify-time (date time)
   "Prettify DATE and TIME for nice commit message"
   ;; TODO: implement
-  (concat "[" date " " time "]"))
+  ;; (message "%s" (parse-time-string (concat date "T" time)))
+  ;; (message "%s" (current-time))
+  (let* ((parsed-time (parse-time-string (concat date "T" time)))
+         (now (decode-time (current-time)))
+         (month-diff (- (nth 4 now) (nth 4 parsed-time)))
+         (days-diff (- (nth 3 now) (nth 3 parsed-time)))
+         (same-year-p (= (nth 5 now) (nth 5 parsed-time)))
+         (same-year-and-month-p (and same-year-p (= month-diff 0)))
+         (same-day-p (and same-year-and-month-p (= days-diff 0)))
+         (hours-diff (- (nth 2 now) (nth 2 parsed-time)))
+         (same-hour-p (and same-day-p (= hours-diff 0)))
+         (minutes-diff (- (nth 1 now) (nth 2 parsed-time)))
+
+         (pretty-date (cond ((time-equal-p now parsed-time) "Now")
+                            (same-hour-p (format "%s minutes ago" minutes-diff))
+                            ((and same-day-p (<= hours-diff 5)) (format "%s hours ago"))
+                            ;; TODO: add yesterday
+                            ((and same-year-and-month-p (<= days-diff 3)) (format  "%s days ago" days-diff))
+                            (same-day-p (concat "Today " time))
+                            ;; ((and same-year-p (<= month-diff 1)) "P")
+                            ((and (= month-diff 1) same-year-p) "Previous month")
+                            ((and same-year-p (<= month-diff 3)) (format "%s month ago" month-diff))
+                            (t (concat date " " time ))
+                            )))
+    (format "[%s]" pretty-date)
+    ))
 
 (defun blamer--format-commit-info (commit-hash
                                    commit-message
@@ -167,9 +192,7 @@ DATE - date in format YYYY-DD-MM
 TIME - time in format HH:MM:SS
 OFFSET - additional offset for commit message"
 
-  ;; TODO: add function for prettify current time
-  ;; (message "hash - %s\n commit-message - %s\n author - %s\n date - %s\n time - %s\n"
-  ;;          commit-hash commit-message author date time)
+
   (concat (make-string (or offset 0) ? )
           (or blamer--prefix "")
           (if blamer--author-enabled-p (concat author " ") "")
@@ -194,9 +217,10 @@ Return nil if error."
   "Return color of background under current cursor position."
   (let ((face (or (get-char-property (point) 'read-face-name)
                   (get-char-property (point) 'face))))
-    (if (boundp 'hl-line-mode)
-        (face-attribute 'hl-line :background)
-      (face-attribute face :background))))
+
+    (cond ((region-active-p) (face-attribute 'region :background))
+          ((boundp 'hl-line-mode) (face-attribute 'hl-line :background))
+          (t (face-attribute face :background)))))
 
 (defun blamer--render ()
   "Render text about current line commit status."
@@ -272,7 +296,7 @@ Return nil if error."
          (clear-overlays-p (or long-line-p region-deselected-p)))
 
 
-    (message "deselected: %s clear %s" region-deselected-p clear-overlays-p)
+    ;; (message "deselected: %s clear %s" region-deselected-p clear-overlays-p)
     (when clear-overlays-p
       (blamer--clear-overlay))
 
