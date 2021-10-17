@@ -9,7 +9,6 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 #+BEGIN_SRC emacs-lisp
 (use-package blamer
   :quelpa (blamer :fetcher github :repo "artawower/blamer.el")
-  :hook ((typescript-mode ng2-mode js-mode go-mode python-mode) . blamer-mode)
   (blamer--idle-time 0.3)
   (blamer--commit-message-enabled-p nil)
   (blamer--min-offset 70)
