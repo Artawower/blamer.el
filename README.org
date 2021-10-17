@@ -2,15 +2,24 @@
 
 * Blamer.el
 A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/items?itemName=eamodio.gitlens][VS Code's GitLens plugin]].
+
+[[./images/preview.gif]]
 * Install
 *** quelpa
 #+BEGIN_SRC emacs-lisp
 (use-package blamer
   :quelpa (blamer :fetcher github :repo "artawower/blamer.el")
   :hook ((typescript-mode ng2-mode js-mode go-mode python-mode) . blamer-mode)
-  :defer t
+  (blamer--idle-time 0.3)
+  (blamer--commit-message-enabled-p nil)
+  (blamer--min-offset 70)
+  :custom-face
+  (blamer--face ((t :foreground "#7a88cf"
+                    :background nil
+                    :height 140
+                    :italic t)))
   :config
-  (setq blamer--idle-time 1))
+  (global-blamer-mode 1))
   #+END_SRC
 
 *** doom
@@ -18,13 +27,20 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 ;; packages.el
 (package! blamer :recipe (:host github :repo "artawower/blamer.el"))
 ;; config.el
-(use-package turbo-log
-  :hook ((typescript-mode ng2-mode js-mode go-mode python-mode) . blamer-mode)
-  :defer t
+(use-package blamer
+  :defer 20
+  :custom
+  (blamer--idle-time 0.3)
+  (blamer--commit-message-enabled-p nil)
+  (blamer--min-offset 70)
+  :custom-face
+  (blamer--face ((t :foreground "#7a88cf"
+                    :background nil
+                    :height 140
+                    :italic t)))
   :config
-  (setq blamer--idle-time 1))
+  (global-blamer-mode 1))
   #+END_SRC
-
 
 * Contribute
 Run before push
