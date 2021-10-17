@@ -270,7 +270,7 @@ Return nil if error."
                                           'cursor t)))
 
         (when (and commit-author (not (eq commit-author "")))
-          (end-of-line)
+          (move-end-of-line nil)
           (setq ov (make-overlay (point) (point) nil t t))
           (overlay-put ov 'after-string popup-message)
           (overlay-put ov 'intangible t)
