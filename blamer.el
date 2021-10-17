@@ -30,7 +30,7 @@
 (require 'simple)
 
 (defconst blamer--regexp-info
-  (concat "\\(?1:^[a-z0-9]+\\) [^\s]*[[:blank:]]?\(\\(?2:[^\n]+\\)"
+  (concat "^(?\\(?1:[a-z0-9]+\\) [^\s]*[[:blank:]]?\(\\(?2:[^\n]+\\)"
           "\s\\(?3:[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\)"
           "\s\\(?4:[0-9]\\{2\\}:[0-9]\\{2\\}:[0-9]\\{2\\}\\)")
 
@@ -40,7 +40,7 @@
 3 - date
 3 - time")
 
-(defconst blamer--commit-message-regexp "\n\n[\s]+\\(?1:[^.]+\\):?"
+(defconst blamer--commit-message-regexp "\n\n[\s]+\\(?1:[^$]+\\):?"
   "Regexp for commit message parsing.")
 
 (defconst blamer--git-author-cmd "git config --get user.name"
@@ -136,7 +136,6 @@ Commit message with more characters will be truncated with ellipsis at the end"
 
 (defvar-local blamer--current-author nil
   "git.name for current repository.")
-
 
 (defun blamer--git-exist-p ()
   "Return t if .git exist."
@@ -277,7 +276,6 @@ Return nil if error."
           (overlay-put ov 'intangible t)
           (add-to-list 'blamer--overlays ov)
           (forward-line))))))
-
 
 (defun blamer--render-commit-info-with-delay ()
   "Render commit info with delay."
