@@ -172,7 +172,7 @@ Commit message with more characters will be truncated with ellipsis at the end"
                             (same-day-p (concat "Today " time))
                             ((and same-year-and-month-p (<= days-diff 3)) (format  "%s days ago" days-diff))
                             ((and (= month-diff 1) same-year-p) "Previous month")
-                            ((and same-year-p (<= month-diff 3)) (format "%s month ago" month-diff))
+                            ((and same-year-p (<= month-diff 3) (> month-diff 0)) (format "%s month ago" month-diff))
                             (t (concat date " " time )))))
     (format "[%s]" pretty-date)))
 
