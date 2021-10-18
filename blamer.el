@@ -4,7 +4,7 @@
 
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
-;; Package-Requires: ((emacs "24.4"))
+;; Package-Requires: ((emacs "27.1"))
 ;; Version: 0.1
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -156,25 +156,27 @@ Commit message with more characters will be truncated with ellipsis at the end"
   "Prettify DATE and TIME for nice commit message"
   (let* ((parsed-time (parse-time-string (concat date "T" time)))
          (now (decode-time (current-time)))
-         (month-diff (- (nth 4 now) (nth 4 parsed-time)))
-         (days-diff (- (nth 3 now) (nth 3 parsed-time)))
-         (same-year-p (= (nth 5 now) (nth 5 parsed-time)))
-         (same-year-and-month-p (and same-year-p (= month-diff 0)))
-         (same-day-p (and same-year-and-month-p (= days-diff 0)))
-         (hours-diff (- (nth 2 now) (nth 2 parsed-time)))
-         (same-hour-p (and same-day-p (= hours-diff 0)))
-         (minutes-diff (- (nth 1 now) (nth 2 parsed-time)))
-
-         (pretty-date (cond ((time-equal-p now parsed-time) "Now")
-                            (same-hour-p (format "%s minutes ago" minutes-diff))
-                            ((and same-day-p (<= hours-diff 5)) (format "%s hours ago" hours-diff))
-                            ;; TODO: add yesterday
-                            (same-day-p (concat "Today " time))
-                            ((and same-year-and-month-p (<= days-diff 3)) (format  "%s days ago" days-diff))
-                            ((and (= month-diff 1) same-year-p) "Previous month")
-                            ((and same-year-p (<= month-diff 3) (> month-diff 0)) (format "%s month ago" month-diff))
+         (seconds-ago (float-time (time-since (concat date "T" time))))
+         (minutes-ago (if (eq seconds-ago 0) 0 (floor (/ seconds-ago 60))))
+         (hours-ago (if (eq minutes-ago 0) 0 (floor (/ minutes-ago 60))))
+         (days-ago (if (eq hours-ago 0) 0 (floor (/ hours-ago 24))))
+         (weeks-ago (if (eq days-ago 0) 0 (floor (/ days-ago 7))))
+         (months-ago (if (eq days-ago 0) 0 (floor (/ days-ago 30))))
+         (years-ago (if (eq months-ago 0) 0 (floor (/ months-ago 12))))
+         (pretty-date (cond ((or (time-equal-p now parsed-time) (< seconds-ago 60)) "Now")
+                            ((< minutes-ago 60) (format "%s minutes ago" minutes-ago))
+                            ((= hours-ago 1) (format "Hour ago"))
+                            ((< hours-ago 24) (format "%s hours ago" hours-ago))
+                            ((= days-ago 1) "Yesterday")
+                            ((< days-ago 7) (format "%s days ago" days-ago))
+                            ((= weeks-ago 1) "Last week")
+                            ((<= weeks-ago 4) (format "%s weeks ago" weeks-ago))
+                            ((= months-ago 1) "Previous month")
+                            ((< months-ago 12) (format "%s months ago" months-ago))
+                            ((= years-ago 1) "Previous year")
+                            ((< years-ago 10) (format "%s years ago" years-ago))
                             (t (concat date " " time )))))
-    (format "[%s]" pretty-date)))
+    pretty-date))
 
 (defun blamer--format-commit-info (commit-hash
                                    commit-message
