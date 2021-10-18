@@ -34,4 +34,5 @@ jobs:
       - uses: leotaku/elisp-check@master
         with:
           check: ert
+          ignore_warnings: ${{ matrix.ignore_warnings }}
           file: test.el

@@ -89,7 +89,11 @@
   :group 'blamer
   :type 'integer)
 
-;; TODO: add type choice
+(defcustom blamer--prettify-time-p t
+  "Enable relative prettified format for datetime."
+  :group 'blamer
+  :type 'boolean)
+
 (defcustom blamer--type 'both
   "Type of blamer.
 'visual - show blame only for current line
@@ -178,6 +182,13 @@ Commit message with more characters will be truncated with ellipsis at the end"
                             (t (concat date " " time )))))
     pretty-date))
 
+(defun blamer--format-datetime (date time)
+  "Format datetime."
+
+  (if blamer--prettify-time-p
+      (blamer--prettify-time date time)
+    (concat date " " time)))
+
 (defun blamer--format-commit-info (commit-hash
                                    commit-message
                                    author
@@ -197,7 +208,7 @@ OFFSET - additional offset for commit message"
   (concat (make-string (or offset 0) ? )
           (or blamer--prefix "")
           (if blamer--author-enabled-p (concat author " ") "")
-          (if blamer--time-enabled-p (concat (blamer--prettify-time date time) " ") "")
+          (if blamer--time-enabled-p (concat (blamer--format-datetime date time) " ") "")
           (if commit-message (format " (%s)" commit-message) "")))
 
 (defun blamer--get-commit-message (hash)

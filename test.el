@@ -97,29 +97,36 @@ But! What we can do with this enormous commit message? Nothing. 123955!!.~\n\n")
 
     (should (equal "59 minutes ago" (blamer--prettify-time (format-date-to-string 59-minutes-ago)
                                                            (format-time-to-string 59-minutes-ago))))
-    (should (equal "59 minutes ago" (blamer--prettify-time (format-date-to-string 59-minutes-ago)
-                                                           (format-time-to-string 59-minutes-ago))))
+
     (should (equal "2 hours ago" (blamer--prettify-time (format-date-to-string 2-hours-ago)
                                                         (format-time-to-string 2-hours-ago))))
+
     (should (equal "Hour ago" (blamer--prettify-time (format-date-to-string 1-hour-ago)
                                                      (format-time-to-string 1-hour-ago))))
+
     (should (equal "23 hours ago" (blamer--prettify-time (format-date-to-string 23-hours-ago)
                                                          (format-time-to-string 23-hours-ago))))
+
     (should (equal "2 days ago" (blamer--prettify-time (format-date-to-string 2-days-ago)
                                                        (format-time-to-string 2-days-ago))))
+
     (should (equal "Last week" (blamer--prettify-time (format-date-to-string week-ago)
                                                       (format-time-to-string week-ago))))
+
     (should (equal "4 weeks ago" (blamer--prettify-time (format-date-to-string 4-weeks-ago)
                                                         (format-time-to-string 4-weeks-ago))))
+
     (should (equal "Previous month" (blamer--prettify-time (format-date-to-string month-ago)
                                                            (format-time-to-string month-ago))))
+
     (should (equal "9 months ago" (blamer--prettify-time (format-date-to-string 9-months-ago)
                                                          (format-time-to-string 9-months-ago))))
+
     (should (equal "Previous year" (blamer--prettify-time (format-date-to-string year-ago)
                                                           (format-time-to-string year-ago))))
+
     (should (equal "4 years ago" (blamer--prettify-time (format-date-to-string 4-years-ago)
                                                         (format-time-to-string 4-years-ago))))
-    (setq )
+
     (should (equal 11-years-ago-prettified (blamer--prettify-time (format-date-to-string 11-years-ago)
-                                                                                     (format-time-to-string 11-years-ago))))
-    ))
+                                                                  (format-time-to-string 11-years-ago))))))
