@@ -60,8 +60,18 @@
   "Show commit info at the end of a current line."
   :group 'tools)
 
-(defcustom blamer--prefix "   ◉ "
-  "String inserted before commit info."
+(defcustom blamer--author-formatter "   %s, "
+  "Format string for author name"
+  :group 'blamer
+  :type 'string)
+
+(defcustom blamer--datetime-formatter "%s"
+  "Format string for datetime."
+  :group 'blamer
+  :type 'string)
+
+(defcustom blamer--commit-formatter "◉ %s"
+  "Format string for commit message."
   :group 'blamer
   :type 'string)
 
@@ -123,7 +133,6 @@ Commit message with more characters will be truncated with ellipsis at the end"
   "Face for blamer info."
   :group 'blamer)
 
-
 (defvar blamer--idle-timer nil
   "Current timer before commit info showing.")
 
@@ -167,28 +176,35 @@ Commit message with more characters will be truncated with ellipsis at the end"
          (days-ago (if (eq hours-ago 0) 0 (floor (/ hours-ago 24))))
          (weeks-ago (if (eq days-ago 0) 0 (floor (/ days-ago 7))))
          (months-ago (if (eq days-ago 0) 0 (floor (/ days-ago 30))))
-         (years-ago (if (eq months-ago 0) 0 (floor (/ months-ago 12))))
-         (pretty-date (cond ((or (time-equal-p now parsed-time) (< seconds-ago 60)) "Now")
-                            ((< minutes-ago 60) (format "%s minutes ago" minutes-ago))
-                            ((= hours-ago 1) (format "Hour ago"))
-                            ((< hours-ago 24) (format "%s hours ago" hours-ago))
-                            ((= days-ago 1) "Yesterday")
-                            ((< days-ago 7) (format "%s days ago" days-ago))
-                            ((= weeks-ago 1) "Last week")
-                            ((<= weeks-ago 4) (format "%s weeks ago" weeks-ago))
-                            ((= months-ago 1) "Previous month")
-                            ((< months-ago 12) (format "%s months ago" months-ago))
-                            ((= years-ago 1) "Previous year")
-                            ((< years-ago 10) (format "%s years ago" years-ago))
-                            (t (concat date " " time )))))
-    pretty-date))
+         (years-ago (if (eq months-ago 0) 0 (floor (/ months-ago 12)))))
+
+    (cond ((or (time-equal-p now parsed-time) (< seconds-ago 60)) "Now")
+          ((< minutes-ago 60) (format "%s minutes ago" minutes-ago))
+          ((= hours-ago 1) (format "Hour ago"))
+          ((< hours-ago 24) (format "%s hours ago" hours-ago))
+          ((= days-ago 1) "Yesterday")
+          ((< days-ago 7) (format "%s days ago" days-ago))
+          ((= weeks-ago 1) "Last week")
+          ((<= weeks-ago 4) (format "%s weeks ago" weeks-ago))
+          ((= months-ago 1) "Previous month")
+          ((< months-ago 12) (format "%s months ago" months-ago))
+          ((= years-ago 1) "Previous year")
+          ((< years-ago 10) (format "%s years ago" years-ago))
+          (t (concat date " " time )))))
 
 (defun blamer--format-datetime (date time)
-  "Format datetime."
+  "Format DATE and TIME."
+  (format blamer--datetime-formatter (if blamer--prettify-time-p
+                                         (blamer--prettify-time date time)
+                                       (concat date " " time))))
 
-  (if blamer--prettify-time-p
-      (blamer--prettify-time date time)
-    (concat date " " time)))
+(defun blamer--format-author (author)
+  "Format AUTHOR name/you."
+  (format blamer--author-formatter author))
+
+(defun blamer--format-commit-message (commit-message)
+  "Format COMMIT-MESSAGE."
+  (format blamer--commit-formatter commit-message))
 
 (defun blamer--format-commit-info (commit-hash
                                    commit-message
@@ -204,13 +220,12 @@ AUTHOR - name of commiter
 DATE - date in format YYYY-DD-MM
 TIME - time in format HH:MM:SS
 OFFSET - additional offset for commit message"
-
+  (ignore commit-hash)
 
   (concat (make-string (or offset 0) ? )
-          (or blamer--prefix "")
-          (if blamer--author-enabled-p (concat author " ") "")
+          (if blamer--author-enabled-p (blamer--format-author author) "")
           (if blamer--time-enabled-p (concat (blamer--format-datetime date time) " ") "")
-          (if commit-message (format " (%s)" commit-message) "")))
+          (if commit-message (blamer--format-commit-message commit-message) "")))
 
 (defun blamer--get-commit-message (hash)
   "Get commit message by provided HASH.
@@ -252,6 +267,8 @@ Return nil if error."
          (blame-cmd-res (shell-command-to-string cmd))
          (blame-cmd-res (butlast (split-string blame-cmd-res "\n")))
          commit-message popup-message error commit-hash commit-author commit-date commit-time ov offset)
+
+    ;; (message "long line: %s | deselected: %s clear %s" long-line-p region-deselected-p clear-overlays-p)
 
     (blamer--clear-overlay)
 
@@ -307,8 +324,6 @@ Return nil if error."
          (region-deselected-p (and blamer--previous-region-active-p (not (region-active-p))))
          (clear-overlays-p (or long-line-p region-deselected-p)))
 
-
-    ;; (message "long line: %s | deselected: %s clear %s" long-line-p region-deselected-p clear-overlays-p)
     (when clear-overlays-p
       (blamer--clear-overlay))
 
@@ -320,7 +335,6 @@ Return nil if error."
                (or (not blamer--previous-line-number)
                    (not (eq blamer--previous-line-number (line-number-at-pos)))
                    (not (eq blamer--previous-line-length (length (thing-at-point 'line))))))
-      ;; TODO: move this check to run local mode?)
 
       (blamer--clear-overlay)
       (setq blamer--previous-line-number (line-number-at-pos))
