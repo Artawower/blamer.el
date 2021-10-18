@@ -47,7 +47,7 @@ Run before push
 emacs -batch -l ert -l blamer.el -l test.el -f ert-run-tests-batch-and-exit
 #+END_SRC
 
-* TODO Blamer.el plans [13/15]
+* TODO Blamer.el plans [13/16]
 - [X] Get necessary information about current line under cursor
 - [X] Get commit info by current hash (if necessary)
 - [X] Get background color if hl-mode is exist and enabled (transparency)
@@ -62,4 +62,5 @@ emacs -batch -l ert -l blamer.el -l test.el -f ert-run-tests-batch-and-exit
 - [X] Add support for common line number changed (might be deleted from external source, or evil keys)
 - [X] Add support for global mode
 - [X] Add support for multi line selection
+- [ ] Canonical blamer format + templates.
 - [ ] Add async process call

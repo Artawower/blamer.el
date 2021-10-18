@@ -294,12 +294,13 @@ Return nil if error."
          (clear-overlays-p (or long-line-p region-deselected-p)))
 
 
-    ;; (message "deselected: %s clear %s" region-deselected-p clear-overlays-p)
+    ;; (message "long line: %s | deselected: %s clear %s" long-line-p region-deselected-p clear-overlays-p)
     (when clear-overlays-p
       (blamer--clear-overlay))
 
 
-    (when (and (or (eq blamer--type 'both)
+    (when (and (not long-line-p)
+               (or (eq blamer--type 'both)
                    (and (eq blamer--type 'visual) (not (use-region-p)))
                    (and (eq blamer--type 'selected) (use-region-p)))
                (or (not blamer--previous-line-number)
