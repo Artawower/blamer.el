@@ -28,6 +28,7 @@
 
 (require 'subr-x)
 (require 'simple)
+(require 'time-date)
 
 (defconst blamer--regexp-info
   (concat "^(?\\(?1:[a-z0-9]+\\) [^\s]*[[:blank:]]?\(\\(?2:[^\n]+\\)"
@@ -158,7 +159,7 @@ Commit message with more characters will be truncated with ellipsis at the end"
 
 (defun blamer--prettify-time (date time)
   "Prettify DATE and TIME for nice commit message"
-  (let* ((parsed-time (parse-time-string (concat date "T" time)))
+  (let* ((parsed-time (decoded-time-set-defaults (parse-time-string (concat date "T" time))))
          (now (decode-time (current-time)))
          (seconds-ago (float-time (time-since (concat date "T" time))))
          (minutes-ago (if (eq seconds-ago 0) 0 (floor (/ seconds-ago 60))))
