@@ -85,7 +85,7 @@ But! What we can do with this enormous commit message? Nothing. 123955!!.~\n\n")
          (11-years-ago-prettified (concat
                                    (format-date-to-string 11-years-ago)
                                    " "
-                                   (format-time-to-string 11-years-ago))))
+                                   (blamer--truncate-time (format-time-to-string 11-years-ago)))))
 
     (should (equal "Yesterday" (blamer--prettify-time formatted-date formatted-time)))
 
@@ -130,3 +130,9 @@ But! What we can do with this enormous commit message? Nothing. 123955!!.~\n\n")
 
     (should (equal 11-years-ago-prettified (blamer--prettify-time (format-date-to-string 11-years-ago)
                                                                   (format-time-to-string 11-years-ago))))))
+
+(ert-deftest test-time-truncating ()
+  "Test prettified time format."
+  (should (equal "15:40" (blamer--truncate-time "15:40:22")))
+  (should (equal "00:00" (blamer--truncate-time "00:00:00")))
+  (should (equal "12:30" (blamer--truncate-time "12:30:21"))))
