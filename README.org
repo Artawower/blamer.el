@@ -2,7 +2,7 @@
 #+html: <img src="./images/evil-monkey.png" align="right" width="16%">
 [[https://github.com/artawower/blamer.el/actions/workflows/lint.yml/badge.svg]]
 
-A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/items?itemName=eamodio.gitlens][VS Code's GitLens plugin]].
+A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/items?itemName=eamodio.gitlens][VS Code's GitLens plugin]] and [[https://github.com/APZelos/blamer.nvim][Vim plugin]]
 
 * Preview
 [[./images/preview.gif]]
