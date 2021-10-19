@@ -75,6 +75,7 @@
   :group 'blamer
   :type 'string)
 
+;; TODO: remove useless flags
 (defcustom blamer--time-enabled-p t
   "Show time of commit"
   :group 'blamer
@@ -111,9 +112,9 @@
 'selected - show blame only for selected line
 'both - both of them"
   :group 'blamer
-  :type '(choice (const :tag "Visual only" visual)
-                 (const :tag "Visual and selected" both)
-                 (const :tag "Selected only" selected)))
+  :type '(choice (const :tag "Visual only" 'visual)
+                 (const :tag "Visual and selected" 'both)
+                 (const :tag "Selected only" 'selected)))
 
 (defcustom blamer--max-lines 30
   "Maximum blamed lines"
@@ -125,6 +126,11 @@
 Commit message with more characters will be truncated with ellipsis at the end"
   :group 'blamer
   :type 'integer)
+
+(defcustom blamer--uncommitted-changes-message "Uncommitted changes"
+  "Message for uncommitted lines."
+  :group 'blamer
+  :type 'string)
 
 (defface blamer--face
   '((t :foreground "#7a88cf"
@@ -229,7 +235,7 @@ OFFSET - additional offset for commit message"
   (let ((uncommitted (string= author "Not Committed Yet")))
     (when uncommitted
       (setq author "You")
-      (setq commit-message "Uncommitted changes"))
+      (setq commit-message blamer--uncommitted-changes-message))
 
     (concat (make-string (or offset 0) ? )
             (if blamer--author-enabled-p (blamer--format-author author) "")

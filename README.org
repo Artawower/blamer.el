@@ -1,9 +1,12 @@
+#+TITLE: Blamer.el
+#+html: <img src="./images/evil-monkey.png" align="right" width="16%">
 [[https://github.com/artawower/blamer.el/actions/workflows/lint.yml/badge.svg]]
 
-* Blamer.el
 A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/items?itemName=eamodio.gitlens][VS Code's GitLens plugin]].
 
+* Preview
 [[./images/preview.gif]]
+
 * Install
 *** quelpa
 #+BEGIN_SRC emacs-lisp
@@ -40,6 +43,37 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
   :config
   (global-blamer-mode 1))
   #+END_SRC
+
+* Customization
+**** Template for author name
+=(setq blamer--author-formatter "  ✎ %s ")=
+**** Template for datetime
+=(setq blamer--datetime-formatter "[%s]")=
+**** Template for commit message
+=(setq blamer--commit-formatter "● %s")=
+
+#+html: <img src="./images/formatted.jpg" align="center" width="100%">
+**** Time before blame showing
+=(setq blamer--idle-time 0.5)=
+**** Minimum offset from start from line
+=(setq blamer--min-offset 40)=
+**** Prettify time
+=(setq blamer--prettify-time-p t)=
+Will format time line (/2 days ago/1 week ago/Yesterday/ etc)
+**** Blamer type
+=(setq blamer--type 'both)=
+Can accept
+- ='selected= - blamer will show commit info for every selected line.
+- ='visual= - blamer will show info only about one line.
+- ='both= - works with both states.
+**** Max blamer lines in selected mode
+If more then 30 lines will selected, blamer will not try to execute git commands.
+=(setq blamer--max-lines 30)=
+**** Message for uncommitted changes
+=(setq blamer--uncommitted-changes-message "NO COMMITTED")=
+**** Max commit message length
+If line has length more then this value, text will be truncated
+=(setq blamer--max-commit-message-length 10)=
 
 * Contribute
 Run before push
