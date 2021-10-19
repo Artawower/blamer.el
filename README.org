@@ -63,4 +63,3 @@ emacs -batch -l ert -l blamer.el -l test.el -f ert-run-tests-batch-and-exit
 - [X] Add support for global mode
 - [X] Add support for multi line selection
 - [X] Canonical blamer format + templates.
-- [ ] Add async process call

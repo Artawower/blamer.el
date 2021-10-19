@@ -166,6 +166,10 @@ Commit message with more characters will be truncated with ellipsis at the end"
   "Return t if CMD-RES contain error"
   (string-match-p  "^fatal:" cmd-res))
 
+(defun blamer--truncate-time (time)
+  "Remove seconds from TIME string."
+  (string-join (butlast (split-string time ":")) ":"))
+
 (defun blamer--prettify-time (date time)
   "Prettify DATE and TIME for nice commit message"
   (let* ((parsed-time (decoded-time-set-defaults (parse-time-string (concat date "T" time))))
@@ -190,17 +194,17 @@ Commit message with more characters will be truncated with ellipsis at the end"
           ((< months-ago 12) (format "%s months ago" months-ago))
           ((= years-ago 1) "Previous year")
           ((< years-ago 10) (format "%s years ago" years-ago))
-          (t (concat date " " time )))))
+          (t (concat date " " (blamer--truncate-time time) )))))
 
 (defun blamer--format-datetime (date time)
   "Format DATE and TIME."
   (format blamer--datetime-formatter (if blamer--prettify-time-p
                                          (blamer--prettify-time date time)
-                                       (concat date " " time))))
+                                       (concat date " " (blamer--truncate-time time)))))
 
 (defun blamer--format-author (author)
   "Format AUTHOR name/you."
-  (format blamer--author-formatter author))
+  (format blamer--author-formatter (string-trim author)))
 
 (defun blamer--format-commit-message (commit-message)
   "Format COMMIT-MESSAGE."
@@ -372,7 +376,9 @@ will appear after BLAMER--IDLE-TIME. It works only inside git repo"
   :lighter nil
   :group 'blamer
   (let ((is-git-repo (blamer--git-exist-p)))
-    (when (and blamer--author-enabled-p is-git-repo)
+    (when (and (not blamer--current-author)
+               blamer--author-enabled-p
+               is-git-repo)
       (setq-local blamer--current-author (substring (shell-command-to-string blamer--git-author-cmd) 0 -1)))
 
     (if (and blamer-mode (buffer-file-name) is-git-repo)
