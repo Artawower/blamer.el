@@ -222,10 +222,15 @@ TIME - time in format HH:MM:SS
 OFFSET - additional offset for commit message"
   (ignore commit-hash)
 
-  (concat (make-string (or offset 0) ? )
-          (if blamer--author-enabled-p (blamer--format-author author) "")
-          (if blamer--time-enabled-p (concat (blamer--format-datetime date time) " ") "")
-          (if commit-message (blamer--format-commit-message commit-message) "")))
+  (let ((uncommitted (string= author "Not Committed Yet")))
+    (when uncommitted
+      (setq author "You")
+      (setq commit-message "Uncommitted changes"))
+
+    (concat (make-string (or offset 0) ? )
+            (if blamer--author-enabled-p (blamer--format-author author) "")
+            (if (and (not uncommitted) blamer--time-enabled-p) (concat (blamer--format-datetime date time) " ") "")
+            (if commit-message (blamer--format-commit-message commit-message) ""))))
 
 (defun blamer--get-commit-message (hash)
   "Get commit message by provided HASH.
