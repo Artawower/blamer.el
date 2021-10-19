@@ -75,21 +75,21 @@
   :group 'blamer
   :type 'string)
 
-;; TODO: remove useless flags
-(defcustom blamer--time-enabled-p t
-  "Show time of commit"
-  :group 'blamer
-  :type 'boolean)
+;; ;; TODO: remove useless flags
+;; (defcustom blamer--time-enabled-p t
+;;   "Show time of commit"
+;;   :group 'blamer
+;;   :type 'boolean)
 
-(defcustom blamer--commit-message-enabled-p t
-  "Show commit message whether this flat is t."
-  :group 'blamer
-  :type 'boolean)
+;; (defcustom blamer--commit-message-enabled-p t
+;;   "Show commit message whether this flat is t."
+;;   :group 'blamer
+;;   :type 'boolean)
 
-(defcustom blamer--author-enabled-p t
-  "Show time of commit"
-  :group 'blamer
-  :type 'boolean)
+;; (defcustom blamer--author-enabled-p t
+;;   "Show time of commit"
+;;   :group 'blamer
+;;   :type 'boolean)
 
 (defcustom blamer--idle-time 0.5
   "Seconds before commit info show"
@@ -214,7 +214,7 @@ Commit message with more characters will be truncated with ellipsis at the end"
 
 (defun blamer--format-commit-message (commit-message)
   "Format COMMIT-MESSAGE."
-  (format blamer--commit-formatter commit-message))
+  (if blamer--commit-formatter (format blamer--commit-formatter commit-message) ""))
 
 (defun blamer--format-commit-info (commit-hash
                                    commit-message
@@ -238,8 +238,8 @@ OFFSET - additional offset for commit message"
       (setq commit-message blamer--uncommitted-changes-message))
 
     (concat (make-string (or offset 0) ? )
-            (if blamer--author-enabled-p (blamer--format-author author) "")
-            (if (and (not uncommitted) blamer--time-enabled-p) (concat (blamer--format-datetime date time) " ") "")
+            (if blamer--author-formatter (blamer--format-author author) "")
+            (if (and (not uncommitted) blamer--datetime-formatter) (concat (blamer--format-datetime date time) " ") "")
             (if commit-message (blamer--format-commit-message commit-message) ""))))
 
 (defun blamer--get-commit-message (hash)
@@ -303,7 +303,7 @@ Return nil if error."
           (setq commit-author (if (string= commit-author blamer--current-author) "You" commit-author))
           (setq commit-date (match-string 3 cmd-msg))
           (setq commit-time (match-string 4 cmd-msg))
-          (setq commit-message (if blamer--commit-message-enabled-p
+          (setq commit-message (if blamer--commit-formatter
                                    (blamer--get-commit-message commit-hash)))
           (setq popup-message (blamer--format-commit-info commit-hash
                                                           commit-message
@@ -381,9 +381,13 @@ will appear after BLAMER--IDLE-TIME. It works only inside git repo"
   :global nil
   :lighter nil
   :group 'blamer
+  (when (and (not blamer--author-formatter)
+             (not blamer--commit-formatter)
+             (not blamer--datetime-formatter))
+    (message "Your have to provide at least one formatter for blamer.el"))
   (let ((is-git-repo (blamer--git-exist-p)))
     (when (and (not blamer--current-author)
-               blamer--author-enabled-p
+               blamer--author-formatter
                is-git-repo)
       (setq-local blamer--current-author (substring (shell-command-to-string blamer--git-author-cmd) 0 -1)))
 
