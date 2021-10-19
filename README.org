@@ -12,10 +12,10 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 #+BEGIN_SRC emacs-lisp
 (use-package blamer
   :quelpa (blamer :fetcher github :repo "artawower/blamer.el")
-  (blamer--idle-time 0.3)
-  (blamer--min-offset 70)
+  (blamer-idle-time 0.3)
+  (blamer-min-offset 70)
   :custom-face
-  (blamer--face ((t :foreground "#7a88cf"
+  (blamer-face ((t :foreground "#7a88cf"
                     :background nil
                     :height 140
                     :italic t)))
@@ -31,10 +31,10 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 (use-package blamer
   :defer 20
   :custom
-  (blamer--idle-time 0.3)
-  (blamer--min-offset 70)
+  (blamer-idle-time 0.3)
+  (blamer-min-offset 70)
   :custom-face
-  (blamer--face ((t :foreground "#7a88cf"
+  (blamer-face ((t :foreground "#7a88cf"
                     :background nil
                     :height 140
                     :italic t)))
@@ -44,35 +44,35 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 
 * Customization
 **** Template for author name
-=(setq blamer--author-formatter "  ✎ %s ")=
+=(setq blamer-author-formatter "  ✎ %s ")=
 **** Template for datetime
-=(setq blamer--datetime-formatter "[%s]")=
+=(setq blamer-datetime-formatter "[%s]")=
 **** Template for commit message
-=(setq blamer--commit-formatter "● %s")=
+=(setq blamer-commit-formatter "● %s")=
 
 All formatters can be nil.
 #+html: <img src="./images/formatted.jpg" align="center" width="100%">
 **** Time before blame showing
-=(setq blamer--idle-time 0.5)=
+=(setq blamer-idle-time 0.5)=
 **** Minimum offset from start from line
-=(setq blamer--min-offset 40)=
+=(setq blamer-min-offset 40)=
 **** Prettify time
-=(setq blamer--prettify-time-p t)=
+=(setq blamer-prettify-time-p t)=
 Will format time line (/2 days ago/1 week ago/Yesterday/ etc)
 **** Blamer type
-=(setq blamer--type 'both)=
+=(setq blamer-type 'both)=
 Can accept
 - ='selected= - blamer will show commit info for every selected line.
 - ='visual= - blamer will show info only about one line.
 - ='both= - works with both states.
 **** Max blamer lines in selected mode
 If more then 30 lines will selected, blamer will not try to execute git commands.
-=(setq blamer--max-lines 30)=
+=(setq blamer-max-lines 30)=
 **** Message for uncommitted changes
-=(setq blamer--uncommitted-changes-message "NO COMMITTED")=
+=(setq blamer-uncommitted-changes-message "NO COMMITTED")=
 **** Max commit message length
 If line has length more then this value, text will be truncated
-=(setq blamer--max-commit-message-length 10)=
+=(setq blamer-max-commit-message-length 10)=
 
 * Contribute
 Run before push

@@ -60,53 +60,38 @@
   "Show commit info at the end of a current line."
   :group 'tools)
 
-(defcustom blamer--author-formatter "   %s, "
+(defcustom blamer-author-formatter "   %s, "
   "Format string for author name"
   :group 'blamer
   :type 'string)
 
-(defcustom blamer--datetime-formatter "%s"
+(defcustom blamer-datetime-formatter "%s"
   "Format string for datetime."
   :group 'blamer
   :type 'string)
 
-(defcustom blamer--commit-formatter "◉ %s"
+(defcustom blamer-commit-formatter "◉ %s"
   "Format string for commit message."
   :group 'blamer
   :type 'string)
 
-;; ;; TODO: remove useless flags
-;; (defcustom blamer--time-enabled-p t
-;;   "Show time of commit"
-;;   :group 'blamer
-;;   :type 'boolean)
 
-;; (defcustom blamer--commit-message-enabled-p t
-;;   "Show commit message whether this flat is t."
-;;   :group 'blamer
-;;   :type 'boolean)
-
-;; (defcustom blamer--author-enabled-p t
-;;   "Show time of commit"
-;;   :group 'blamer
-;;   :type 'boolean)
-
-(defcustom blamer--idle-time 0.5
+(defcustom blamer-idle-time 0.5
   "Seconds before commit info show"
   :group 'blamer
   :type 'float)
 
-(defcustom blamer--min-offset 60
+(defcustom blamer-min-offset 60
   "Minimum symbols before insert commit info"
   :group 'blamer
   :type 'integer)
 
-(defcustom blamer--prettify-time-p t
+(defcustom blamer-prettify-time-p t
   "Enable relative prettified format for datetime."
   :group 'blamer
   :type 'boolean)
 
-(defcustom blamer--type 'both
+(defcustom blamer-type 'both
   "Type of blamer.
 'visual - show blame only for current line
 'selected - show blame only for selected line
@@ -116,30 +101,30 @@
                  (const :tag "Visual and selected" 'both)
                  (const :tag "Selected only" 'selected)))
 
-(defcustom blamer--max-lines 30
+(defcustom blamer-max-lines 30
   "Maximum blamed lines"
   :group 'blamer
   :type 'integer)
 
-(defcustom blamer--max-commit-message-length 30
+(defcustom blamer-max-commit-message-length 30
   "Max length of commit message.
 Commit message with more characters will be truncated with ellipsis at the end"
   :group 'blamer
   :type 'integer)
 
-(defcustom blamer--uncommitted-changes-message "Uncommitted changes"
+(defcustom blamer-uncommitted-changes-message "Uncommitted changes"
   "Message for uncommitted lines."
   :group 'blamer
   :type 'string)
 
-(defface blamer--face
+(defface blamer-face
   '((t :foreground "#7a88cf"
        :background nil
        :italic t))
   "Face for blamer info."
   :group 'blamer)
 
-(defvar blamer--idle-timer nil
+(defvar blamer-idle-timer nil
   "Current timer before commit info showing.")
 
 (defvar blamer--previous-line-number nil
@@ -204,17 +189,17 @@ Commit message with more characters will be truncated with ellipsis at the end"
 
 (defun blamer--format-datetime (date time)
   "Format DATE and TIME."
-  (format blamer--datetime-formatter (if blamer--prettify-time-p
+  (format blamer-datetime-formatter (if blamer-prettify-time-p
                                          (blamer--prettify-time date time)
                                        (concat date " " (blamer--truncate-time time)))))
 
 (defun blamer--format-author (author)
   "Format AUTHOR name/you."
-  (format blamer--author-formatter (string-trim author)))
+  (format blamer-author-formatter (string-trim author)))
 
 (defun blamer--format-commit-message (commit-message)
   "Format COMMIT-MESSAGE."
-  (if blamer--commit-formatter (format blamer--commit-formatter commit-message) ""))
+  (if blamer-commit-formatter (format blamer-commit-formatter commit-message) ""))
 
 (defun blamer--format-commit-info (commit-hash
                                    commit-message
@@ -235,11 +220,11 @@ OFFSET - additional offset for commit message"
   (let ((uncommitted (string= author "Not Committed Yet")))
     (when uncommitted
       (setq author "You")
-      (setq commit-message blamer--uncommitted-changes-message))
+      (setq commit-message blamer-uncommitted-changes-message))
 
     (concat (make-string (or offset 0) ? )
-            (if blamer--author-formatter (blamer--format-author author) "")
-            (if (and (not uncommitted) blamer--datetime-formatter) (concat (blamer--format-datetime date time) " ") "")
+            (if blamer-author-formatter (blamer--format-author author) "")
+            (if (and (not uncommitted) blamer-datetime-formatter) (concat (blamer--format-datetime date time) " ") "")
             (if commit-message (blamer--format-commit-message commit-message) ""))))
 
 (defun blamer--get-commit-message (hash)
@@ -254,7 +239,7 @@ Return nil if error."
       (setq commit-message (match-string 1 git-commit-res))
       (setq commit-message (replace-regexp-in-string "\n" " " commit-message))
       (setq commit-message (string-trim commit-message))
-      (truncate-string-to-width commit-message blamer--max-commit-message-length nil nil "..."))))
+      (truncate-string-to-width commit-message blamer-max-commit-message-length nil nil "..."))))
 
 (defun blamer--get-background-color ()
   "Return color of background under current cursor position."
@@ -296,14 +281,14 @@ Return nil if error."
         ;; (message "start %s, end %s iterator %s" start-line-number end-line-number navigator)
         (setq error (blamer--git-cmd-error-p cmd-msg))
         (when (not error)
-          (setq offset (max (- (or blamer--min-offset 0) (length (thing-at-point 'line))) 0))
+          (setq offset (max (- (or blamer-min-offset 0) (length (thing-at-point 'line))) 0))
           (string-match blamer--regexp-info cmd-msg)
           (setq commit-hash (match-string 1 cmd-msg))
           (setq commit-author (match-string 2 cmd-msg))
           (setq commit-author (if (string= commit-author blamer--current-author) "You" commit-author))
           (setq commit-date (match-string 3 cmd-msg))
           (setq commit-time (match-string 4 cmd-msg))
-          (setq commit-message (if blamer--commit-formatter
+          (setq commit-message (if blamer-commit-formatter
                                    (blamer--get-commit-message commit-hash)))
           (setq popup-message (blamer--format-commit-info commit-hash
                                                           commit-message
@@ -312,7 +297,7 @@ Return nil if error."
                                                           commit-time
                                                           offset))
           (setq popup-message (propertize popup-message
-                                          'face `(:inherit (blamer--face :background ,(blamer--get-background-color)))
+                                          'face `(:inherit (blamer-face :background ,(blamer--get-background-color)))
                                           'cursor t)))
 
         (when (and commit-author (not (eq commit-author "")))
@@ -325,17 +310,17 @@ Return nil if error."
 
 (defun blamer--render-commit-info-with-delay ()
   "Render commit info with delay."
-  (if blamer--idle-timer
-      (cancel-timer blamer--idle-timer))
+  (if blamer-idle-timer
+      (cancel-timer blamer-idle-timer))
 
-  (setq blamer--idle-timer
-        (run-with-idle-timer (or blamer--idle-time 0) nil 'blamer--render)))
+  (setq blamer-idle-timer
+        (run-with-idle-timer (or blamer-idle-time 0) nil 'blamer--render)))
 
 (defun blamer--try-render ()
   "Render current line if is .git exist."
   ;; TODO: refactor it >.<
   (let* ((long-line-p (and (region-active-p)
-                           (> (count-lines (region-beginning) (region-end)) blamer--max-lines)))
+                           (> (count-lines (region-beginning) (region-end)) blamer-max-lines)))
          (region-deselected-p (and blamer--previous-region-active-p (not (region-active-p))))
          (clear-overlays-p (or long-line-p region-deselected-p)))
 
@@ -344,9 +329,9 @@ Return nil if error."
 
 
     (when (and (not long-line-p)
-               (or (eq blamer--type 'both)
-                   (and (eq blamer--type 'visual) (not (use-region-p)))
-                   (and (eq blamer--type 'selected) (use-region-p)))
+               (or (eq blamer-type 'both)
+                   (and (eq blamer-type 'visual) (not (use-region-p)))
+                   (and (eq blamer-type 'selected) (use-region-p)))
                (or (not blamer--previous-line-number)
                    (not (eq blamer--previous-line-number (line-number-at-pos)))
                    (not (eq blamer--previous-line-length (length (thing-at-point 'line))))))
@@ -359,11 +344,11 @@ Return nil if error."
 
 (defun blamer--reset-state ()
   "Reset all state after blamer mode is disabled."
-  (if blamer--idle-timer
-      (cancel-timer blamer--idle-timer))
+  (if blamer-idle-timer
+      (cancel-timer blamer-idle-timer))
 
   (blamer--clear-overlay)
-  (setq blamer--idle-timer nil)
+  (setq blamer-idle-timer nil)
   (setq blamer--previous-line-number nil)
   (remove-hook 'post-command-hook #'blamer--try-render t))
 
@@ -376,18 +361,18 @@ argument disables it.  From Lisp, argument omitted or nil enables
 the mode, `toggle' toggles the state.
 
 When blamer-mode is enabled, the popup message with commit info
-will appear after BLAMER--IDLE-TIME. It works only inside git repo"
+will appear after BLAMER-IDLE-TIME. It works only inside git repo"
   :init-value nil
   :global nil
   :lighter nil
   :group 'blamer
-  (when (and (not blamer--author-formatter)
-             (not blamer--commit-formatter)
-             (not blamer--datetime-formatter))
+  (when (and (not blamer-author-formatter)
+             (not blamer-commit-formatter)
+             (not blamer-datetime-formatter))
     (message "Your have to provide at least one formatter for blamer.el"))
   (let ((is-git-repo (blamer--git-exist-p)))
     (when (and (not blamer--current-author)
-               blamer--author-formatter
+               blamer-author-formatter
                is-git-repo)
       (setq-local blamer--current-author (substring (shell-command-to-string blamer--git-author-cmd) 0 -1)))
 
