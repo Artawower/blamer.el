@@ -387,7 +387,8 @@ will appear after BLAMER-IDLE-TIME. It works only inside git repo"
   blamer-mode
   (lambda ()
     (when (not blamer-mode)
-      (blamer-mode))))
+      (blamer-mode)))
+  :group 'blamer)
 
 (provide 'blamer)
 ;;; blamer.el ends here
