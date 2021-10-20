@@ -8,6 +8,7 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 [[./images/preview.gif]]
 
 * Install
+*Emacs 27.1 is required.*
 *** quelpa
 #+BEGIN_SRC emacs-lisp
 (use-package blamer
