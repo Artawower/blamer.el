@@ -29,6 +29,7 @@
 (require 'subr-x)
 (require 'simple)
 (require 'time-date)
+(require 'posframe)
 
 (defconst blamer--regexp-info
   (concat "^(?\\(?1:[a-z0-9]+\\) [^\s]*[[:blank:]]?\(\\(?2:[^\n]+\\)"
@@ -250,9 +251,12 @@ OFFSET - additional offset for commit message"
 
          (offset (cond (blamer-align-right-p (- (window-width) (string-width formatted-message) (string-width (string-trim-right (thing-at-point 'line)))))
                        (offset offset)
-                       (t 0))))
+                       (t 0)))
+         (alignment-text (propertize (make-string (+ additional-offset offset) ?\s)
+                                     'face `(:background ,(blamer--get-background-color))
+                                     'cursor t)))
 
-    (concat (propertize (make-string (+ additional-offset offset) ?\s) 'face `(:background ,(blamer--get-background-color))) formatted-message)))
+    (concat alignment-text formatted-message)))
 
 (defun blamer--get-commit-message (hash)
   "Get commit message by provided HASH.
