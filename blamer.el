@@ -101,6 +101,11 @@
                  (const :tag "Visual and selected" 'both)
                  (const :tag "Selected only" 'selected)))
 
+(defcustom blamer-self-author-name "You"
+  "Message for commits where you are author."
+  :group 'blamer
+  :type 'string)
+
 (defcustom blamer-max-lines 30
   "Maximum blamed lines"
   :group 'blamer
@@ -190,8 +195,8 @@ Commit message with more characters will be truncated with ellipsis at the end"
 (defun blamer--format-datetime (date time)
   "Format DATE and TIME."
   (format blamer-datetime-formatter (if blamer-prettify-time-p
-                                         (blamer--prettify-time date time)
-                                       (concat date " " (blamer--truncate-time time)))))
+                                        (blamer--prettify-time date time)
+                                      (concat date " " (blamer--truncate-time time)))))
 
 (defun blamer--format-author (author)
   "Format AUTHOR name/you."
@@ -219,11 +224,11 @@ OFFSET - additional offset for commit message"
 
   (let ((uncommitted (string= author "Not Committed Yet")))
     (when uncommitted
-      (setq author "You")
+      (setq author blamer-self-author-name)
       (setq commit-message blamer-uncommitted-changes-message))
 
     (concat (make-string (or offset 0) ? )
-            (if blamer-author-formatter (blamer--format-author author) "")
+            (if (and blamer-author-formatter author) (blamer--format-author author) "")
             (if (and (not uncommitted) blamer-datetime-formatter) (concat (blamer--format-datetime date time) " ") "")
             (if commit-message (blamer--format-commit-message commit-message) ""))))
 
@@ -234,7 +239,7 @@ Return nil if error."
          (has-error (blamer--git-cmd-error-p git-commit-res))
          commit-message)
 
-    (when (not has-error)
+    (unless has-error
       (string-match blamer--commit-message-regexp git-commit-res)
       (setq commit-message (match-string 1 git-commit-res))
       (setq commit-message (replace-regexp-in-string "\n" " " commit-message))
@@ -274,22 +279,24 @@ Return nil if error."
 
     ;; TODO: reduce responsability
     (save-excursion
-      (if (region-active-p)
-          (goto-char (region-beginning)))
+      (when (region-active-p)
+        (goto-char (region-beginning)))
 
       (dolist (cmd-msg blame-cmd-res)
         ;; (message "start %s, end %s iterator %s" start-line-number end-line-number navigator)
         (setq error (blamer--git-cmd-error-p cmd-msg))
-        (when (not error)
+        (unless error
           (setq offset (max (- (or blamer-min-offset 0) (length (thing-at-point 'line))) 0))
           (string-match blamer--regexp-info cmd-msg)
           (setq commit-hash (match-string 1 cmd-msg))
           (setq commit-author (match-string 2 cmd-msg))
-          (setq commit-author (if (string= commit-author blamer--current-author) "You" commit-author))
+          (setq commit-author (if (and (string= commit-author blamer--current-author) blamer-self-author-name)
+                                  blamer-self-author-name
+                                commit-author))
           (setq commit-date (match-string 3 cmd-msg))
           (setq commit-time (match-string 4 cmd-msg))
-          (setq commit-message (if blamer-commit-formatter
-                                   (blamer--get-commit-message commit-hash)))
+          (setq commit-message (when blamer-commit-formatter
+                                 (blamer--get-commit-message commit-hash)))
           (setq popup-message (blamer--format-commit-info commit-hash
                                                           commit-message
                                                           commit-author
@@ -310,8 +317,8 @@ Return nil if error."
 
 (defun blamer--render-commit-info-with-delay ()
   "Render commit info with delay."
-  (if blamer-idle-timer
-      (cancel-timer blamer-idle-timer))
+  (when blamer-idle-timer
+    (cancel-timer blamer-idle-timer))
 
   (setq blamer-idle-timer
         (run-with-idle-timer (or blamer-idle-time 0) nil 'blamer--render)))
@@ -366,10 +373,11 @@ will appear after BLAMER-IDLE-TIME. It works only inside git repo"
   :global nil
   :lighter nil
   :group 'blamer
-  (when (and (not blamer-author-formatter)
-             (not blamer-commit-formatter)
-             (not blamer-datetime-formatter))
+  (unless (or blamer-author-formatter
+              blamer-commit-formatter
+              blamer-datetime-formatter)
     (message "Your have to provide at least one formatter for blamer.el"))
+
   (let ((is-git-repo (blamer--git-exist-p)))
     (when (and (not blamer--current-author)
                blamer-author-formatter
@@ -386,7 +394,7 @@ will appear after BLAMER-IDLE-TIME. It works only inside git repo"
   global-blamer-mode
   blamer-mode
   (lambda ()
-    (when (not blamer-mode)
+    (unless blamer-mode
       (blamer-mode)))
   :group 'blamer)
 
