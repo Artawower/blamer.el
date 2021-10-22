@@ -29,7 +29,6 @@
 (require 'subr-x)
 (require 'simple)
 (require 'time-date)
-(require 'posframe)
 
 (defconst blamer--regexp-info
   (concat "^(?\\(?1:[a-z0-9]+\\) [^\s]*[[:blank:]]?\(\\(?2:[^\n]+\\)"
