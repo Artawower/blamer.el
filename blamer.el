@@ -29,10 +29,9 @@
 (require 'subr-x)
 (require 'simple)
 (require 'time-date)
-(require 'posframe)
 
 (defconst blamer--regexp-info
-  (concat "^(?\\(?1:[a-z0-9]+\\) [^\s]*[[:blank:]]?\(\\(?2:[^\n]+\\)"
+  (concat "^(?\\(?1:[^\s]+\\) [^\s]*[[:blank:]]?\(\\(?2:[^\n]+\\)"
           "\s\\(?3:[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\)"
           "\s\\(?4:[0-9]\\{2\\}:[0-9]\\{2\\}:[0-9]\\{2\\}\\)")
 
@@ -46,7 +45,7 @@
   "Regexp for commit message parsing.")
 
 (defconst blamer--git-author-cmd "git config --get user.name"
-  "Command for getting current git user name")
+  "Command for getting current git user name.")
 
 (defconst blamer--git-repo-cmd "git rev-parse --is-inside-work-tree"
   "Command for detect git repo.")
@@ -62,7 +61,7 @@
   :group 'tools)
 
 (defcustom blamer-author-formatter "   %s, "
-  "Format string for author name"
+  "Format string for author name."
   :group 'blamer
   :type 'string)
 
@@ -78,12 +77,12 @@
 
 
 (defcustom blamer-idle-time 0.5
-  "Seconds before commit info show"
+  "Seconds before commit info show."
   :group 'blamer
   :type 'float)
 
 (defcustom blamer-min-offset 60
-  "Minimum symbols before insert commit info"
+  "Minimum symbols before insert commit info."
   :group 'blamer
   :type 'integer)
 
@@ -92,11 +91,9 @@
   :group 'blamer
   :type 'boolean)
 
-;; TODO: if somebody knows how to find real width of text with different font size
-;; and align it with other texts i'll be really happy
 (defcustom blamer-offset-per-symbol nil
   "Its a crutch :< for font less then original editor font. Use carefully.
-Will add additional space after each BLAMER-OFFSET-PER-SYMBOL"
+Will add additional space for each BLAMER-OFFSET-PER-SYMBOL"
   :group 'blamer
   :type 'integer)
 
@@ -116,7 +113,7 @@ Will add additional space after each BLAMER-OFFSET-PER-SYMBOL"
   :type 'string)
 
 (defcustom blamer-max-lines 30
-  "Maximum blamed lines"
+  "Maximum blamed lines."
   :group 'blamer
   :type 'integer)
 
@@ -135,6 +132,12 @@ Commit message with more characters will be truncated with ellipsis at the end"
   "Should be all record aligned at right."
   :group 'blamer
   :type 'boolean)
+
+(defcustom blamer-view 'overlay
+  "View for commit message. Can be 'posframe and 'overlay."
+  :group 'blamer
+  :type '(choice (const :tag "Posframe" 'posframe)
+                 (const :tag "Overlay" 'overlay)))
 
 (defface blamer-face
   '((t :foreground "#7a88cf"
@@ -159,7 +162,7 @@ Commit message with more characters will be truncated with ellipsis at the end"
   "Current active overlays for git blame messages.")
 
 (defvar-local blamer--current-author nil
-  "git.name for current repository.")
+  "Git.name for current repository.")
 
 (defun blamer--git-exist-p ()
   "Return t if .git exist."
@@ -168,12 +171,13 @@ Commit message with more characters will be truncated with ellipsis at the end"
 
 (defun blamer--clear-overlay ()
   "Clear last overlay."
+  ;; (posframe-delete-all)
   (dolist (ov blamer--overlays)
     (delete-overlay ov))
   (setq blamer--overlays '()))
 
 (defun blamer--git-cmd-error-p (cmd-res)
-  "Return t if CMD-RES contain error"
+  "Return t if CMD-RES contain error."
   (string-match-p  "^fatal:" cmd-res))
 
 (defun blamer--truncate-time (time)
@@ -181,7 +185,7 @@ Commit message with more characters will be truncated with ellipsis at the end"
   (string-join (butlast (split-string time ":")) ":"))
 
 (defun blamer--prettify-time (date time)
-  "Prettify DATE and TIME for nice commit message"
+  "Prettify DATE and TIME for nice commit message."
   (let* ((parsed-time (decoded-time-set-defaults (parse-time-string (concat date "T" time))))
          (now (decode-time (current-time)))
          (seconds-ago (float-time (time-since (concat date "T" time))))
@@ -252,6 +256,8 @@ OFFSET - additional offset for commit message"
          (offset (cond (blamer-align-right-p (- (window-width) (string-width formatted-message) (string-width (string-trim-right (thing-at-point 'line)))))
                        (offset offset)
                        (t 0)))
+         (offset (+ additional-offset offset))
+         (offset (if (> offset 0) offset 0))
          (alignment-text (propertize (make-string (+ additional-offset offset) ?\s)
                                      'face `(:background ,(blamer--get-background-color))
                                      'cursor t)))
@@ -262,9 +268,8 @@ OFFSET - additional offset for commit message"
   "Get commit message by provided HASH.
 Return nil if error."
   (let* ((git-commit-res (shell-command-to-string (format blamer--git-commit-message hash)))
-         (has-error (blamer--git-cmd-error-p git-commit-res))
+         (has-error (or (blamer--git-cmd-error-p git-commit-res) (eq (length git-commit-res) 0)))
          commit-message)
-
     (unless has-error
       (string-match blamer--commit-message-regexp git-commit-res)
       (setq commit-message (match-string 1 git-commit-res))
@@ -314,6 +319,7 @@ Return nil if error."
           (string-match blamer--regexp-info cmd-msg)
           (setq commit-hash (match-string 1 cmd-msg))
           (setq commit-author (match-string 2 cmd-msg))
+
           (setq commit-author (if (and (string= commit-author blamer--current-author) blamer-self-author-name)
                                   blamer-self-author-name
                                 commit-author))
@@ -390,7 +396,7 @@ A positive prefix argument enables the mode, any other prefix
 argument disables it.  From Lisp, argument omitted or nil enables
 the mode, `toggle' toggles the state.
 
-When blamer-mode is enabled, the popup message with commit info
+When `blamer-mode' is enabled, the popup message with commit info
 will appear after BLAMER-IDLE-TIME. It works only inside git repo"
   :init-value nil
   :global nil

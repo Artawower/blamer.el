@@ -8,7 +8,7 @@
   "Test blame parser regexp."
   (let* ((blame-msg-1 "(44307898 (artawower 2021-10-16 14:06:06 +0300 241)          commit-message")
          (blame-msg-2 "(b3a30c6ae (Andrey Tokarev 2020-12-16 16:28:09 +0800 4) $tooltip-border-radius: 2px;)")
-         (blame-msg-3 "(b3130q6ze (@s!~range$><name-+\/ 2020-12-16 16:28:09 +0800 4) $tooltip-border-radius: 2px;)"))
+         (blame-msg-3 "(^3130q6ze (@s!~range$><name-+\/ 2020-12-16 16:28:09 +0800 4) $tooltip-border-radius: 2px;)"))
     (string-match blamer--regexp-info blame-msg-1)
     (should (equal (match-string 1 blame-msg-1) "44307898"))
     (should (equal (match-string 2 blame-msg-1) "artawower"))
@@ -19,10 +19,11 @@
     (should (equal (match-string 1 blame-msg-2) "b3a30c6ae"))
     (should (equal (match-string 2 blame-msg-2) "Andrey Tokarev"))
     (should (equal (match-string 3 blame-msg-2) "2020-12-16"))
+
     (should (equal (match-string 4 blame-msg-2) "16:28:09"))
 
     (string-match blamer--regexp-info blame-msg-3)
-    (should (equal (match-string 1 blame-msg-3) "b3130q6ze"))
+    (should (equal (match-string 1 blame-msg-3) "^3130q6ze"))
     (should (equal (match-string 2 blame-msg-3) "@s!~range$><name-+\/"))
     (should (equal (match-string 3 blame-msg-3) "2020-12-16"))
     (should (equal (match-string 4 blame-msg-3) "16:28:09"))))
