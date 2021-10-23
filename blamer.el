@@ -131,7 +131,7 @@ Commit message with more characters will be truncated with ellipsis at the end"
 (defcustom blamer-view 'overlay
   "View for commit message. Can be 'overlay and 'overlay-right."
   :group 'blamer
-  :type '(choice (const :tag "Posframe" overlay-right)
+  :type '(choice (const :tag "Overlay right" overlay-right)
                  (const :tag "Overlay" overlay)))
 
 (defface blamer-face
