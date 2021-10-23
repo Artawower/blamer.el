@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1"))
-;; Version: 0.1
+;; Version: 0.2
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -103,9 +103,9 @@ Will add additional space for each BLAMER-OFFSET-PER-SYMBOL"
 'selected - show blame only for selected line
 'both - both of them"
   :group 'blamer
-  :type '(choice (const :tag "Visual only" 'visual)
-                 (const :tag "Visual and selected" 'both)
-                 (const :tag "Selected only" 'selected)))
+  :type '(choice (const :tag "Visual only" visual)
+                 (const :tag "Visual and selected" both)
+                 (const :tag "Selected only" selected)))
 
 (defcustom blamer-self-author-name "You"
   "Message for commits where you are author."
@@ -128,16 +128,11 @@ Commit message with more characters will be truncated with ellipsis at the end"
   :group 'blamer
   :type 'string)
 
-(defcustom blamer-align-right-p t
-  "Should be all record aligned at right."
-  :group 'blamer
-  :type 'boolean)
-
 (defcustom blamer-view 'overlay
-  "View for commit message. Can be 'posframe and 'overlay."
+  "View for commit message. Can be 'overlay and 'overlay-right."
   :group 'blamer
-  :type '(choice (const :tag "Posframe" 'posframe)
-                 (const :tag "Overlay" 'overlay)))
+  :type '(choice (const :tag "Posframe" overlay-right)
+                 (const :tag "Overlay" overlay)))
 
 (defface blamer-face
   '((t :foreground "#7a88cf"
@@ -253,7 +248,9 @@ OFFSET - additional offset for commit message"
          (additional-offset (if blamer-offset-per-symbol
                                 (/ (string-width formatted-message) blamer-offset-per-symbol) 0))
 
-         (offset (cond (blamer-align-right-p (- (window-width) (string-width formatted-message) (string-width (string-trim-right (thing-at-point 'line)))))
+         (offset (cond ((eq blamer-view 'overlay-right) (- (window-width)
+                                                           (string-width formatted-message)
+                                                           (string-width (string-trim-right (thing-at-point 'line)))))
                        (offset offset)
                        (t 0)))
          (offset (+ additional-offset offset))

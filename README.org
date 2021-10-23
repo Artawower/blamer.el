@@ -44,6 +44,9 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
   #+END_SRC
 
 * Customization
+**** Blamer view
+Current style for blame messages, now can be `overlay` and `overlay-right`.
+=(setq blamer-view 'overlay)=
 **** Template for author name
 =(setq blamer-author-formatter "  ✎ %s ")=
 **** Template for datetime
