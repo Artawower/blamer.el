@@ -21,8 +21,8 @@
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ;;; Commentary:
-;; Package for showing current line commit info with idle.
-;; Works with git only.
+;; Package for displaying git information about the current line or
+;; about several selected lines. Works with git only.
 
 ;;; Code:
 
