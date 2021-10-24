@@ -272,7 +272,7 @@ Return nil if error."
       (truncate-string-to-width commit-message blamer-max-commit-message-length nil nil "..."))))
 
 (defun blamer--create-popup-msg (blame-msg)
-  "Handle current BLAME-MSG"
+  "Handle current BLAME-MSG."
   (unless (blamer--git-cmd-error-p blame-msg)
     (string-match blamer--regexp-info blame-msg)
     (let* ((offset (max (- (or blamer-min-offset 0) (length (thing-at-point 'line))) 0))
