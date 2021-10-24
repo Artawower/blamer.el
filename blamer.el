@@ -166,7 +166,6 @@ Commit message with more characters will be truncated with ellipsis at the end"
 
 (defun blamer--clear-overlay ()
   "Clear last overlay."
-  ;; (posframe-delete-all)
   (dolist (ov blamer--overlays)
     (delete-overlay ov))
   (setq blamer--overlays '()))
@@ -244,10 +243,8 @@ OFFSET - additional offset for commit message"
          (formatted-message (propertize formatted-message
                                         'face `(:inherit (blamer-face :background ,(blamer--get-background-color)))
                                         'cursor t))
-
          (additional-offset (if blamer-offset-per-symbol
                                 (/ (string-width formatted-message) blamer-offset-per-symbol) 0))
-
          (offset (cond ((eq blamer-view 'overlay-right) (- (window-width)
                                                            (string-width formatted-message)
                                                            (string-width (string-trim-right (thing-at-point 'line)))))
@@ -274,6 +271,30 @@ Return nil if error."
       (setq commit-message (string-trim commit-message))
       (truncate-string-to-width commit-message blamer-max-commit-message-length nil nil "..."))))
 
+(defun blamer--create-popup-msg (blame-msg)
+  "Handle current BLAME-MSG"
+  (unless (blamer--git-cmd-error-p blame-msg)
+    (string-match blamer--regexp-info blame-msg)
+    (let* ((offset (max (- (or blamer-min-offset 0) (length (thing-at-point 'line))) 0))
+           (commit-hash (match-string 1 blame-msg))
+           (commit-author (match-string 2 blame-msg))
+           (commit-author (if (and (string= commit-author blamer--current-author) blamer-self-author-name)
+                              blamer-self-author-name
+                            commit-author))
+           (commit-date (match-string 3 blame-msg))
+           (commit-time (match-string 4 blame-msg))
+           (commit-message (when blamer-commit-formatter
+                             (blamer--get-commit-message commit-hash)))
+           (popup-message (blamer--format-commit-info commit-hash
+                                                      commit-message
+                                                      commit-author
+                                                      commit-date
+                                                      commit-time
+                                                      offset)))
+
+      (when (and commit-author (not (eq commit-author "")))
+        popup-message))))
+
 (defun blamer--get-background-color ()
   "Return color of background under current cursor position."
   (let ((face (or (get-char-property (point) 'read-face-name)
@@ -298,9 +319,7 @@ Return nil if error."
          (file-name (buffer-file-name))
          (cmd (format blamer--git-blame-cmd start-line-number end-line-number file-name))
          (blame-cmd-res (shell-command-to-string cmd))
-         (blame-cmd-res (butlast (split-string blame-cmd-res "\n")))
-         commit-message popup-message error commit-hash commit-author commit-date commit-time ov offset)
-
+         (blame-cmd-res (butlast (split-string blame-cmd-res "\n"))))
 
     (blamer--clear-overlay)
 
@@ -309,35 +328,15 @@ Return nil if error."
         (goto-char (region-beginning)))
 
       (dolist (cmd-msg blame-cmd-res)
-        ;; (message "start %s, end %s iterator %s" start-line-number end-line-number navigator)
-        (setq error (blamer--git-cmd-error-p cmd-msg))
-        (unless error
-          (setq offset (max (- (or blamer-min-offset 0) (length (thing-at-point 'line))) 0))
-          (string-match blamer--regexp-info cmd-msg)
-          (setq commit-hash (match-string 1 cmd-msg))
-          (setq commit-author (match-string 2 cmd-msg))
-
-          (setq commit-author (if (and (string= commit-author blamer--current-author) blamer-self-author-name)
-                                  blamer-self-author-name
-                                commit-author))
-          (setq commit-date (match-string 3 cmd-msg))
-          (setq commit-time (match-string 4 cmd-msg))
-          (setq commit-message (when blamer-commit-formatter
-                                 (blamer--get-commit-message commit-hash)))
-          (setq popup-message (blamer--format-commit-info commit-hash
-                                                          commit-message
-                                                          commit-author
-                                                          commit-date
-                                                          commit-time
-                                                          offset)))
-
-        (when (and commit-author (not (eq commit-author "")))
-          (move-end-of-line nil)
-          (setq ov (make-overlay (point) (point) nil t t))
-          (overlay-put ov 'after-string popup-message)
-          (overlay-put ov 'intangible t)
-          (add-to-list 'blamer--overlays ov)
-          (forward-line))))))
+        (let* ((popup-msg (blamer--create-popup-msg cmd-msg))
+               (ov (progn
+                     (move-end-of-line nil)
+                     (make-overlay (point) (point) nil t t))))
+          (when popup-msg
+            (overlay-put ov 'after-string popup-msg)
+            (overlay-put ov 'intangible t)
+            (add-to-list 'blamer--overlays ov)
+            (forward-line)))))))
 
 (defun blamer--render-commit-info-with-delay ()
   "Render commit info with delay."

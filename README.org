@@ -84,7 +84,7 @@ Run before push
 emacs -batch -l ert -l blamer.el -l test.el -f ert-run-tests-batch-and-exit
 #+END_SRC
 
-* TODO Blamer.el plans [15/16]
+* TODO Blamer.el plans [15/15]
 - [X] Get necessary information about current line under cursor
 - [X] Get commit info by current hash (if necessary)
 - [X] Get background color if hl-mode is exist and enabled (transparency)
