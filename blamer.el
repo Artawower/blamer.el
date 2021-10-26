@@ -26,7 +26,7 @@
 
 ;;; Code:
 
-(require 'file)
+(require 'files)
 (require 'subr-x)
 (require 'simple)
 (require 'time-date)
