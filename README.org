@@ -13,6 +13,7 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 #+BEGIN_SRC emacs-lisp
 (use-package blamer
   :quelpa (blamer :fetcher github :repo "artawower/blamer.el")
+  :custom
   (blamer-idle-time 0.3)
   (blamer-min-offset 70)
   :custom-face
@@ -45,7 +46,7 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 
 * Customization
 **** Blamer view
-Current style for blame messages, now can be `overlay` and `overlay-right`.
+Current style for blame messages, now can be =overlay= and =overlay-right=.
 =(setq blamer-view 'overlay)=
 **** Template for author name
 =(setq blamer-author-formatter "  ✎ %s ")=
