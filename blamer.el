@@ -26,9 +26,11 @@
 
 ;;; Code:
 
+(require 'files)
 (require 'subr-x)
 (require 'simple)
 (require 'time-date)
+(require 'tramp)
 
 (defconst blamer--regexp-info
   (concat "^(?\\(?1:[^\s]+\\) [^\s]*[[:blank:]]?\(\\(?2:[^\n]+\\)"
@@ -304,6 +306,13 @@ Return nil if error."
           ((boundp 'hl-line-mode) (face-attribute 'hl-line :background))
           (t (face-attribute face :background)))))
 
+(defun blamer--get-local-name (filename)
+  "Return local FILENAME if path is in the tramp format."
+  (if (file-remote-p default-directory)
+      (tramp-file-name-localname
+       (tramp-dissect-file-name filename))
+    filename))
+
 (defun blamer--render ()
   "Render text about current line commit status."
   (let* ((end-line-number (if (region-active-p)
@@ -316,7 +325,7 @@ Return nil if error."
                                   (goto-char (region-beginning))
                                   (line-number-at-pos))
                               (line-number-at-pos)))
-         (file-name (buffer-file-name))
+         (file-name (blamer--get-local-name (buffer-file-name)))
          (cmd (format blamer--git-blame-cmd start-line-number end-line-number file-name))
          (blame-cmd-res (shell-command-to-string cmd))
          (blame-cmd-res (butlast (split-string blame-cmd-res "\n"))))
