@@ -26,9 +26,11 @@
 
 ;;; Code:
 
+(require 'file)
 (require 'subr-x)
 (require 'simple)
 (require 'time-date)
+(require 'tramp)
 
 (defconst blamer--regexp-info
   (concat "^(?\\(?1:[^\s]+\\) [^\s]*[[:blank:]]?\(\\(?2:[^\n]+\\)"
@@ -305,6 +307,7 @@ Return nil if error."
           (t (face-attribute face :background)))))
 
 (defun blamer--get-local-name (filename)
+  "Return local FILENAME if path is in the tramp format."
   (if (file-remote-p default-directory)
       (tramp-file-name-localname
        (tramp-dissect-file-name filename))
