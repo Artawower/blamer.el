@@ -62,18 +62,23 @@
   "Show commit info at the end of a current line."
   :group 'tools)
 
-(defcustom blamer-author-formatter "   %s, "
+(defcustom blamer-author-formatter "%s, "
   "Format string for author name."
   :group 'blamer
   :type 'string)
 
-(defcustom blamer-datetime-formatter "%s"
+(defcustom blamer-datetime-formatter "%s "
   "Format string for datetime."
   :group 'blamer
   :type 'string)
 
 (defcustom blamer-commit-formatter "◉ %s"
   "Format string for commit message."
+  :group 'blamer
+  :type 'string)
+
+(defcustom blamer-entire-formatter "   %s"
+  "Format entire commit string."
   :group 'blamer
   :type 'string)
 
@@ -208,17 +213,29 @@ Commit message with more characters will be truncated with ellipsis at the end"
 
 (defun blamer--format-datetime (date time)
   "Format DATE and TIME."
-  (format blamer-datetime-formatter (if blamer-prettify-time-p
-                                        (blamer--prettify-time date time)
-                                      (concat date " " (blamer--truncate-time time)))))
+  (if (and blamer-datetime-formatter date time)
+      (format blamer-datetime-formatter (if blamer-prettify-time-p
+                                            (blamer--prettify-time date time)
+                                          (concat date " " (blamer--truncate-time time))))
+    ""))
 
 (defun blamer--format-author (author)
   "Format AUTHOR name/you."
-  (format blamer-author-formatter (string-trim author)))
+  (if (and author blamer-author-formatter)
+      (format blamer-author-formatter (string-trim author))
+    ""))
 
 (defun blamer--format-commit-message (commit-message)
   "Format COMMIT-MESSAGE."
-  (if blamer-commit-formatter (format blamer-commit-formatter commit-message) ""))
+  (if (and blamer-commit-formatter commit-message)
+      (format blamer-commit-formatter commit-message)
+    ""))
+
+(defun blamer--format-entire-message (msg)
+  "Final format for entire built MSG."
+  (if blamer-entire-formatter
+      (format blamer-entire-formatter msg)
+    msg))
 
 (defun blamer--format-commit-info (commit-hash
                                    commit-message
@@ -239,9 +256,10 @@ OFFSET - additional offset for commit message"
   (let* ((uncommitted (string= author "Not Committed Yet"))
          (author (if uncommitted blamer-self-author-name author))
          (commit-message (if uncommitted blamer-uncommitted-changes-message commit-message))
-         (formatted-message (string-trim (concat (if (and author blamer-author-formatter) (blamer--format-author author) "")
-                                                 (if (and (not uncommitted) blamer-datetime-formatter) (concat (blamer--format-datetime date time) " ") "")
-                                                 (if commit-message (blamer--format-commit-message commit-message) ""))))
+         (formatted-message (blamer--format-entire-message (concat (blamer--format-author author)
+                                    (if (not uncommitted) (blamer--format-datetime date time) "")
+                                    (blamer--format-commit-message commit-message))))
+
          (formatted-message (propertize formatted-message
                                         'face `(:inherit (blamer-face :background ,(blamer--get-background-color)))
                                         'cursor t))
