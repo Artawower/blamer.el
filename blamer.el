@@ -257,17 +257,22 @@ OFFSET - additional offset for commit message"
          (author (if uncommitted blamer-self-author-name author))
          (commit-message (if uncommitted blamer-uncommitted-changes-message commit-message))
          (formatted-message (blamer--format-entire-message (concat (blamer--format-author author)
-                                    (if (not uncommitted) (blamer--format-datetime date time) "")
-                                    (blamer--format-commit-message commit-message))))
+                                                                   (if (not uncommitted) (blamer--format-datetime date time) "")
+                                                                   (blamer--format-commit-message commit-message))))
 
          (formatted-message (propertize formatted-message
                                         'face `(:inherit (blamer-face :background ,(blamer--get-background-color)))
                                         'cursor t))
          (additional-offset (if blamer-offset-per-symbol
                                 (/ (string-width formatted-message) blamer-offset-per-symbol) 0))
+         ;; NOTE https://github.com/Artawower/blamer.el/issues/8
+         (line-number-offset (if (bound-and-true-p display-line-numbers-mode)
+                                 (+ (or (ignore-errors (line-number-display-width)) 0) 2)
+                               0))
          (offset (cond ((eq blamer-view 'overlay-right) (- (window-width)
                                                            (string-width formatted-message)
-                                                           (string-width (string-trim-right (thing-at-point 'line)))))
+                                                           (string-width (thing-at-point 'line))
+                                                           line-number-offset))
                        (offset offset)
                        (t 0)))
          (offset (+ additional-offset offset))
