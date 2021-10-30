@@ -12,7 +12,7 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 *** quelpa
 #+BEGIN_SRC emacs-lisp
 (use-package blamer
-  :quelpa (blamer :fetcher github :repo "artawower/blamer.el")
+  :quelpa ((blamer :fetcher github :repo "artawower/blamer.el") :upgrade t)
   :custom
   (blamer-idle-time 0.3)
   (blamer-min-offset 70)
@@ -55,8 +55,12 @@ Current style for blame messages, now can be =overlay= and =overlay-right=.
 **** Template for commit message
 =(setq blamer-commit-formatter "● %s")=
 
+
 All formatters can be nil.
 #+html: <img src="./images/formatted.jpg" align="center" width="100%">
+**** Template for format entire message.
+If your would like to wrap whole message, or add special prefix before blame text you can use
+=(setq blamer-entire-formatter "<%>")=
 **** Time before blame showing
 =(setq blamer-idle-time 0.5)=
 **** Minimum offset from start from line
