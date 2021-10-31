@@ -326,7 +326,8 @@ Return nil if error."
                   (get-char-property (point) 'face))))
 
     (cond ((region-active-p) (face-attribute 'region :background))
-          ((boundp 'hl-line-mode) (face-attribute 'hl-line :background))
+          ((bound-and-true-p hl-line-mode) (face-attribute 'hl-line :background))
+          ((not face) nil)
           (t (face-attribute face :background)))))
 
 (defun blamer--get-local-name (filename)
