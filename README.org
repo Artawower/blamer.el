@@ -1,6 +1,6 @@
 #+TITLE: Blamer.el
 #+html: <img src="./images/evil-monkey.png" align="right" width="16%">
-[[https://github.com/artawower/blamer.el/actions/workflows/lint.yml/badge.svg]]
+[[https://github.com/artawower/blamer.el/actions/workflows/lint.yml/badge.svg]] [[https://melpa.org/packages/blamer-badge.svg]] [[http://stable.melpa.org/packages/blamer-badge.svg]]
 
 A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/items?itemName=eamodio.gitlens][VS Code's GitLens plugin]] and [[https://github.com/APZelos/blamer.nvim][Vim plugin]]
 
@@ -9,6 +9,23 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 
 * Install
 *Emacs 27.1 is required.*
+*** Melpa
+#+BEGIN_SRC emacs-lisp
+(use-package blamer
+  :ensure t
+  :defer 20
+  :custom
+  (blamer-idle-time 0.3)
+  (blamer-min-offset 70)
+  :custom-face
+  (blamer-face ((t :foreground "#7a88cf"
+                    :background nil
+                    :height 140
+                    :italic t)))
+  :config
+  (global-blamer-mode 1))
+#+END_SRC
+
 *** quelpa
 #+BEGIN_SRC emacs-lisp
 (use-package blamer
@@ -26,10 +43,15 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
   #+END_SRC
 
 *** doom
+*packages.el*
 #+BEGIN_SRC emacs-lisp
-;; packages.el
+(package! blamer)
+;; or
 (package! blamer :recipe (:host github :repo "artawower/blamer.el"))
-;; config.el
+#+END_SRC
+
+*config.el*
+#+BEGIN_SRC emacs-lisp
 (use-package blamer
   :defer 20
   :custom
@@ -89,7 +111,7 @@ Run before push
 emacs -batch -l ert -l blamer.el -l test.el -f ert-run-tests-batch-and-exit
 #+END_SRC
 
-* TODO Blamer.el plans [15/15]
+* TODO Blamer.el plans [15/16]
 - [X] Get necessary information about current line under cursor
 - [X] Get commit info by current hash (if necessary)
 - [X] Get background color if hl-mode is exist and enabled (transparency)
@@ -105,3 +127,4 @@ emacs -batch -l ert -l blamer.el -l test.el -f ert-run-tests-batch-and-exit
 - [X] Add support for global mode
 - [X] Add support for multi line selection
 - [X] Canonical blamer format + templates.
+- [ ] Clickable annotations
