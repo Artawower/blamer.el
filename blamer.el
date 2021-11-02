@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1"))
-;; Version: 0.2.1
+;; Version: 0.2.2
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -368,6 +368,7 @@ Return nil if error."
           (when popup-msg
             (overlay-put ov 'after-string popup-msg)
             (overlay-put ov 'intangible t)
+            (overlay-put ov 'window (get-buffer-window))
             (add-to-list 'blamer--overlays ov)
             (forward-line)))))))
 
