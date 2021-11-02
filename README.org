@@ -105,6 +105,37 @@ If more then 30 lines will selected, blamer will not try to execute git commands
 If line has length more then this value, text will be truncated
 =(setq blamer-max-commit-message-length 10)=
 
+* Interactive binding
+You can bind the mouse click event and pass custom handler. Where the handler is callback function with commit-info arg.
+commit-info consist of:
+
+=:commit-hash= - hash of clicked commit
+=:commit-author= - author name after formatting
+=:raw-commit-author= - raw author username if exist.
+=:commit-date= - date of commit. (string field)
+=:commit-time= - commit's time. (string field)
+=:commit-message= - message of commit. If not exist will be get from
+For example, if we want to open magit diff by left click, and browse remote by right click we can use this code (magit and forge have to be installed):
+
+#+BEGIN_SRC emacs-lisp
+  (defun blamer-callback-show-commit-diff (commit-info)
+    (interactive)
+    (let ((commit-hash (plist-get commit-info :commit-hash)))
+      (when commit-hash
+        (magit-show-commit commit-hash))))
+
+  (defun blamer-callback-open-remote (commit-info)
+    (interactive)
+    (let ((commit-hash (plist-get commit-info :commit-hash)))
+      (when commit-hash
+        (message commit-hash)
+        (forge-browse-commit commit-hash))))
+
+  (setq blamer-bindings '(("<mouse-3>" . blamer-callback-open-remote)
+                          ("<mouse-1>" . blamer-callback-show-commit-diff)))
+#+END_SRC
+
+
 * Contribute
 Run before push
 #+BEGIN_SRC bash

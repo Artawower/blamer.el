@@ -148,6 +148,27 @@ Commit message with more characters will be truncated with ellipsis at the end"
   "Face for blamer info."
   :group 'blamer)
 
+(defcustom blamer-bindings nil
+  "List of bindings.
+
+Callback function applying plist argument:
+:commit-hash - hash of clicked commit
+:commit-author - author name after formatting
+:raw-commit-author - raw author username if exist.
+:commit-date - date of commit. (string field)
+:commit-time - commit's time. (string field)
+:commit-message - message of commit. If not exist will be get from
+`blamer-uncommitted-changes-message' variable.
+
+For example you can pass such bindings for message
+author name by left click and copying commit hash by right click.
+\(without backslash)
+
+'((<mapvar> . (lambda (commit-info) (message (plist-get :commit-author))))
+  (<mapvar> . (lambda (commit-info) (kill-new (plist-get :commit-hash)))))"
+  :group 'blamer
+  :type 'alist)
+
 (defvar blamer-idle-timer nil
   "Current timer before commit info showing.")
 
@@ -209,7 +230,7 @@ Commit message with more characters will be truncated with ellipsis at the end"
           ((< months-ago 12) (format "%s months ago" months-ago))
           ((= years-ago 1) "Previous year")
           ((< years-ago 10) (format "%s years ago" years-ago))
-          (t (concat date " " (blamer--truncate-time time) )))))
+          (t (concat date " " (blamer--truncate-time time))))))
 
 (defun blamer--format-datetime (date time)
   "Format DATE and TIME."
@@ -296,29 +317,41 @@ Return nil if error."
       (setq commit-message (string-trim commit-message))
       (truncate-string-to-width commit-message blamer-max-commit-message-length nil nil "..."))))
 
-(defun blamer--create-popup-msg (blame-msg)
-  "Handle current BLAME-MSG."
-  (unless (blamer--git-cmd-error-p blame-msg)
-    (string-match blamer--regexp-info blame-msg)
-    (let* ((offset (max (- (or blamer-min-offset 0) (length (thing-at-point 'line))) 0))
-           (commit-hash (match-string 1 blame-msg))
-           (commit-author (match-string 2 blame-msg))
-           (commit-author (if (and (string= commit-author blamer--current-author) blamer-self-author-name)
-                              blamer-self-author-name
-                            commit-author))
-           (commit-date (match-string 3 blame-msg))
-           (commit-time (match-string 4 blame-msg))
-           (commit-message (when blamer-commit-formatter
-                             (blamer--get-commit-message commit-hash)))
-           (popup-message (blamer--format-commit-info commit-hash
-                                                      commit-message
-                                                      commit-author
-                                                      commit-date
-                                                      commit-time
-                                                      offset)))
+(defun blamer--parse-line-info (blame-msg)
+  "Parse BLAME-MSG and create a plist."
+  (string-match blamer--regexp-info blame-msg)
+  (let* ((commit-hash (match-string 1 blame-msg))
+         (raw-commit-author (match-string 2 blame-msg))
+         (commit-author (if (and (string= raw-commit-author blamer--current-author) blamer-self-author-name)
+                            blamer-self-author-name
+                          raw-commit-author))
+         (commit-date (match-string 3 blame-msg))
+         (commit-time (match-string 4 blame-msg))
+         (commit-message (when blamer-commit-formatter
+                           (blamer--get-commit-message commit-hash)))
 
-      (when (and commit-author (not (eq commit-author "")))
-        popup-message))))
+         (parsed-commit-info `(:commit-hash ,commit-hash
+                               :commit-author ,commit-author
+                               :commit-date ,commit-date
+                               :commit-time ,commit-time
+                               :raw-commit-author ,raw-commit-author
+                               :commit-message ,commit-message)))
+
+    parsed-commit-info))
+
+(defun blamer--create-popup-msg (commit-info)
+  "Handle current COMMIT-INFO."
+  (let* ((offset (max (- (or blamer-min-offset 0) (length (thing-at-point 'line))) 0))
+         (commit-author (plist-get commit-info :commit-author))
+         (popup-message (blamer--format-commit-info (plist-get commit-info :commit-hash)
+                                                    (plist-get commit-info :commit-message)
+                                                    commit-author
+                                                    (plist-get commit-info :commit-date)
+                                                    (plist-get commit-info :commit-time)
+                                                    offset)))
+
+    (when (and commit-author (not (eq commit-author "")))
+      popup-message)))
 
 (defun blamer--get-background-color ()
   "Return color of background under current cursor position."
@@ -337,40 +370,54 @@ Return nil if error."
        (tramp-dissect-file-name filename))
     filename))
 
+(defun blamer--apply-bindings (text commit-info)
+  "Apply defined bindings to TEXT and pass COMMIT-INFO to callback."
+  (let ((map (make-sparse-keymap)))
+    (dolist (mapbind blamer-bindings)
+      (define-key map (kbd (car mapbind))
+        (lambda ()
+          (interactive)
+          (funcall (cdr mapbind) commit-info)))
+      (setq text (propertize text 'keymap map))))
+  text)
+
 (defun blamer--render ()
   "Render text about current line commit status."
-  (let* ((end-line-number (if (region-active-p)
-                              (save-excursion
-                                (goto-char (region-end))
-                                (line-number-at-pos))
-                            (line-number-at-pos)))
-         (start-line-number (if (region-active-p)
+  (with-current-buffer (window-buffer (get-buffer-window))
+    (let* ((end-line-number (if (region-active-p)
                                 (save-excursion
-                                  (goto-char (region-beginning))
+                                  (goto-char (region-end))
                                   (line-number-at-pos))
                               (line-number-at-pos)))
-         (file-name (blamer--get-local-name (buffer-file-name)))
-         (cmd (format blamer--git-blame-cmd start-line-number end-line-number file-name))
-         (blame-cmd-res (shell-command-to-string cmd))
-         (blame-cmd-res (butlast (split-string blame-cmd-res "\n"))))
+           (start-line-number (if (region-active-p)
+                                  (save-excursion
+                                    (goto-char (region-beginning))
+                                    (line-number-at-pos))
+                                (line-number-at-pos)))
+           (file-name (blamer--get-local-name (buffer-file-name)))
+           (cmd (format blamer--git-blame-cmd start-line-number end-line-number file-name))
+           (blame-cmd-res (shell-command-to-string cmd))
+           (blame-cmd-res (butlast (split-string blame-cmd-res "\n"))))
 
-    (blamer--clear-overlay)
+      (blamer--clear-overlay)
 
-    (save-excursion
-      (when (region-active-p)
-        (goto-char (region-beginning)))
+      (save-excursion
+        (when (region-active-p)
+          (goto-char (region-beginning)))
 
-      (dolist (cmd-msg blame-cmd-res)
-        (let* ((popup-msg (blamer--create-popup-msg cmd-msg))
-               (ov (progn
-                     (move-end-of-line nil)
-                     (make-overlay (point) (point) nil t t))))
-          (when popup-msg
-            (overlay-put ov 'after-string popup-msg)
-            (overlay-put ov 'intangible t)
-            (overlay-put ov 'window (get-buffer-window))
-            (add-to-list 'blamer--overlays ov)
-            (forward-line)))))))
+        (dolist (cmd-msg blame-cmd-res)
+          (unless (blamer--git-cmd-error-p cmd-msg)
+            (let* ((commit-info (blamer--parse-line-info cmd-msg))
+                   (popup-msg (blamer--create-popup-msg commit-info))
+                   (ov (progn
+                         (move-end-of-line nil)
+                         (make-overlay (point) (point) nil t t))))
+              (when popup-msg
+                (overlay-put ov 'after-string (blamer--apply-bindings popup-msg commit-info))
+                (overlay-put ov 'intangible t)
+                (overlay-put ov 'window (get-buffer-window))
+                (add-to-list 'blamer--overlays ov)
+                (forward-line)))))))))
 
 (defun blamer--render-commit-info-with-delay ()
   "Render commit info with delay."
