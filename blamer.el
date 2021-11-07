@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1"))
-;; Version: 0.3.0
+;; Version: 0.3.1
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -174,6 +174,9 @@ author name by left click and copying commit hash by right click.
 
 (defvar blamer--previous-line-number nil
   "Line number of previous popup.")
+
+(defvar blamer--previous-window-width nil
+  "Previous window width.")
 
 (defvar blamer--previous-line-length nil
   "Current line number length for detect rerender function.")
@@ -430,6 +433,7 @@ Return nil if error."
 (defun blamer--preserve-state ()
   "Preserve current editor state for next iteration."
   (setq blamer--previous-line-number (line-number-at-pos))
+  (setq blamer--previous-window-width (window-width))
   (setq blamer--previous-line-length (length (thing-at-point 'line)))
   (setq blamer--previous-region-active-p (region-active-p)))
 
@@ -448,6 +452,7 @@ Return nil if error."
                    (and (eq blamer-type 'visual) (not (use-region-p)))
                    (and (eq blamer-type 'selected) (use-region-p)))
                (or (not blamer--previous-line-number)
+                   (not (eq blamer--previous-window-width (window-width)))
                    (not (eq blamer--previous-line-number (line-number-at-pos)))
                    (not (eq blamer--previous-line-length (length (thing-at-point 'line))))))
 
@@ -463,7 +468,9 @@ Return nil if error."
   (blamer--clear-overlay)
   (setq blamer-idle-timer nil)
   (setq blamer--previous-line-number nil)
-  (remove-hook 'post-command-hook #'blamer--try-render t))
+  (setq blamer--previous-window-width nil)
+  (remove-hook 'post-command-hook #'blamer--try-render t)
+  (remove-hook 'window-state-change-hook #'blamer--try-render t))
 
 ;;;###autoload
 (define-minor-mode blamer-mode
@@ -491,7 +498,8 @@ will appear after BLAMER-IDLE-TIME. It works only inside git repo"
       (setq-local blamer--current-author (replace-regexp-in-string "\n\\'" "" (shell-command-to-string blamer--git-author-cmd))))
     (if (and blamer-mode (buffer-file-name) is-git-repo)
         (progn
-          (add-hook 'post-command-hook #'blamer--try-render nil t))
+          (add-hook 'post-command-hook #'blamer--try-render nil t)
+          (add-hook 'window-state-change-hook #'blamer--try-render nil t))
       (blamer--reset-state))))
 
 ;;;###autoload
