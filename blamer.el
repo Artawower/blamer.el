@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1"))
-;; Version: 0.3.1
+;; Version: 0.3.2
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -31,6 +31,7 @@
 (require 'simple)
 (require 'time-date)
 (require 'tramp)
+(require 'a)
 
 (defconst blamer--regexp-info
   (concat "^(?\\(?1:[^\s]+\\) [^\s]*[[:blank:]]?\(\\(?2:[^\n]+\\)"
@@ -140,6 +141,12 @@ Commit message with more characters will be truncated with ellipsis at the end"
   :group 'blamer
   :type '(choice (const :tag "Overlay right" overlay-right)
                  (const :tag "Overlay" overlay)))
+
+(defcustom blamer-smart-background-p t
+  "When enable blamer will try to find background.
+If not will use background from `blamer-face'"
+  :group 'blamer
+  :type 'boolean)
 
 (defface blamer-face
   '((t :foreground "#7a88cf"
@@ -285,7 +292,9 @@ OFFSET - additional offset for commit message"
                                                                    (blamer--format-commit-message commit-message))))
 
          (formatted-message (propertize formatted-message
-                                        'face `(:inherit (blamer-face :background ,(blamer--get-background-color)))
+                                        'face (flatten-tree
+                                               (a-merge (face-all-attributes 'blamer-face (selected-frame))
+                                                        `((:background ,(blamer--get-background-color)))))
                                         'cursor t))
          (additional-offset (if blamer-offset-per-symbol
                                 (/ (string-width formatted-message) blamer-offset-per-symbol) 0))
@@ -358,13 +367,15 @@ Return nil if error."
 
 (defun blamer--get-background-color ()
   "Return color of background under current cursor position."
-  (let ((face (or (get-char-property (point) 'read-face-name)
-                  (get-char-property (point) 'face))))
+    (move-end-of-line nil)
+    (let ((face (or (get-char-property (point) 'read-face-name)
+                    (get-char-property (point) 'face))))
 
-    (cond ((region-active-p) (face-attribute 'region :background))
-          ((bound-and-true-p hl-line-mode) (face-attribute 'hl-line :background))
-          ((not face) nil)
-          (t (face-attribute face :background)))))
+      (cond ((not blamer-smart-background-p) (face-attribute 'blamer-face :background))
+            ((region-active-p) (face-attribute 'region :background))
+            ((bound-and-true-p hl-line-mode) (face-attribute 'hl-line :background))
+            ((not face) 'unspecified)
+            (t (face-attribute face :background)))))
 
 (defun blamer--get-local-name (filename)
   "Return local FILENAME if path is in the tramp format."

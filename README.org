@@ -104,6 +104,9 @@ If more then 30 lines will selected, blamer will not try to execute git commands
 **** Max commit message length
 If line has length more then this value, text will be truncated
 =(setq blamer-max-commit-message-length 10)=
+**** Prefer blamer face
+If you want to disable automatic background detection you can always use blamer face
+=(setq blamer-smart-background-p nil)=
 
 * Interactive binding
 You can bind the mouse click event and pass custom handler. Where the handler is callback function with commit-info arg.
