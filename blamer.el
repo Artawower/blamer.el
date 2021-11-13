@@ -4,7 +4,7 @@
 
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
-;; Package-Requires: ((emacs "27.1"))
+;; Package-Requires: ((emacs "27.1") (a "1.0.0"))
 ;; Version: 0.3.2
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -375,7 +375,7 @@ Return nil if error."
             ((region-active-p) (face-attribute 'region :background))
             ((bound-and-true-p hl-line-mode) (face-attribute 'hl-line :background))
             ((not face) 'unspecified)
-            (t (face-attribute face :background)))))
+            (t (face-attribute (car face) :background)))))
 
 (defun blamer--get-local-name (filename)
   "Return local FILENAME if path is in the tramp format."
