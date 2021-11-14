@@ -375,7 +375,7 @@ Return nil if error."
             ((region-active-p) (face-attribute 'region :background))
             ((bound-and-true-p hl-line-mode) (face-attribute 'hl-line :background))
             ((not face) 'unspecified)
-            (t (face-attribute (car face) :background)))))
+            (t (face-attribute (or (car-safe face) face) :background)))))
 
 (defun blamer--get-local-name (filename)
   "Return local FILENAME if path is in the tramp format."
