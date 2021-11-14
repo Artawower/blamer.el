@@ -407,8 +407,7 @@ will appear after BLAMER-IDLE-TIME. It works only inside git repo"
     (when (and (not blamer--current-author)
                blamer-author-formatter
                is-git-repo)
-      (setq-local blamer--current-author (substring (shell-command-to-string blamer--git-author-cmd) 0 -1)))
-
+      (setq-local blamer--current-author (replace-regexp-in-string "\n\\'" "" (shell-command-to-string blamer--git-author-cmd))))
     (if (and blamer-mode (buffer-file-name) is-git-repo)
         (progn
           (add-hook 'post-command-hook #'blamer--try-render nil t))
