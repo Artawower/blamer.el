@@ -202,7 +202,7 @@ author name by left click and copying commit hash by right click.
   (let* ((git-exist-stdout (shell-command-to-string blamer--git-repo-cmd)))
     (string-match "^true" git-exist-stdout)))
 
-(defun blamer--clear-overlay ()
+(defun blamer--clear-overlay (&rest _)
   "Clear last overlay."
   (dolist (ov blamer--overlays)
     (delete-overlay ov))
@@ -481,7 +481,9 @@ Return nil if error."
   (setq blamer--previous-line-number nil)
   (setq blamer--previous-window-width nil)
   (remove-hook 'post-command-hook #'blamer--try-render t)
-  (remove-hook 'window-state-change-hook #'blamer--try-render t))
+  (remove-hook 'window-state-change-hook #'blamer--try-render t)
+  (when (bound-and-true-p company-mode)
+            (advice-remove 'company-pseudo-tooltip-show-at-point #'blamer--clear-overlay)))
 
 ;;;###autoload
 (define-minor-mode blamer-mode
@@ -510,7 +512,9 @@ will appear after BLAMER-IDLE-TIME. It works only inside git repo"
     (if (and blamer-mode (buffer-file-name) is-git-repo)
         (progn
           (add-hook 'post-command-hook #'blamer--try-render nil t)
-          (add-hook 'window-state-change-hook #'blamer--try-render nil t))
+          (add-hook 'window-state-change-hook #'blamer--try-render nil t)
+          (when (bound-and-true-p company-mode)
+            (advice-add 'company-pseudo-tooltip-show-at-point :before #'blamer--clear-overlay)))
       (blamer--reset-state))))
 
 ;;;###autoload
