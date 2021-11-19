@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (a "1.0.0"))
-;; Version: 0.3.2
+;; Version: 0.3.3
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -367,15 +367,15 @@ Return nil if error."
 
 (defun blamer--get-background-color ()
   "Return color of background under current cursor position."
-    (move-end-of-line nil)
-    (let ((face (or (get-char-property (point) 'read-face-name)
-                    (get-char-property (point) 'face))))
+  (move-end-of-line nil)
+  (let ((face (or (get-char-property (point) 'read-face-name)
+                  (get-char-property (point) 'face))))
 
-      (cond ((not blamer-smart-background-p) (face-attribute 'blamer-face :background))
-            ((region-active-p) (face-attribute 'region :background))
-            ((bound-and-true-p hl-line-mode) (face-attribute 'hl-line :background))
-            ((not face) 'unspecified)
-            (t (face-attribute (or (car-safe face) face) :background)))))
+    (cond ((not blamer-smart-background-p) (face-attribute 'blamer-face :background))
+          ((region-active-p) (face-attribute 'region :background))
+          ((bound-and-true-p hl-line-mode) (face-attribute 'hl-line :background))
+          ((not face) 'unspecified)
+          (t (face-attribute (or (car-safe face) face) :background)))))
 
 (defun blamer--get-local-name (filename)
   "Return local FILENAME if path is in the tramp format."
@@ -398,40 +398,42 @@ Return nil if error."
 (defun blamer--render ()
   "Render text about current line commit status."
   (with-current-buffer (window-buffer (get-buffer-window))
-    (let* ((end-line-number (if (region-active-p)
-                                (save-excursion
-                                  (goto-char (region-end))
-                                  (line-number-at-pos))
-                              (line-number-at-pos)))
-           (start-line-number (if (region-active-p)
+    (save-restriction
+      (widen)
+      (let* ((end-line-number (if (region-active-p)
                                   (save-excursion
-                                    (goto-char (region-beginning))
+                                    (goto-char (region-end))
                                     (line-number-at-pos))
                                 (line-number-at-pos)))
-           (file-name (blamer--get-local-name (buffer-file-name)))
-           (cmd (format blamer--git-blame-cmd start-line-number end-line-number file-name))
-           (blame-cmd-res (shell-command-to-string cmd))
-           (blame-cmd-res (butlast (split-string blame-cmd-res "\n"))))
+             (start-line-number (if (region-active-p)
+                                    (save-excursion
+                                      (goto-char (region-beginning))
+                                      (line-number-at-pos))
+                                  (line-number-at-pos)))
+             (file-name (blamer--get-local-name (buffer-file-name)))
+             (cmd (format blamer--git-blame-cmd start-line-number end-line-number file-name))
+             (blame-cmd-res (shell-command-to-string cmd))
+             (blame-cmd-res (butlast (split-string blame-cmd-res "\n"))))
 
-      (blamer--clear-overlay)
+        (blamer--clear-overlay)
 
-      (save-excursion
-        (when (region-active-p)
-          (goto-char (region-beginning)))
+        (save-excursion
+          (when (region-active-p)
+            (goto-char (region-beginning)))
 
-        (dolist (cmd-msg blame-cmd-res)
-          (unless (blamer--git-cmd-error-p cmd-msg)
-            (let* ((commit-info (blamer--parse-line-info cmd-msg))
-                   (popup-msg (blamer--create-popup-msg commit-info))
-                   (ov (progn
-                         (move-end-of-line nil)
-                         (make-overlay (point) (point) nil t t))))
-              (when popup-msg
-                (overlay-put ov 'after-string (blamer--apply-bindings popup-msg commit-info))
-                (overlay-put ov 'intangible t)
-                (overlay-put ov 'window (get-buffer-window))
-                (add-to-list 'blamer--overlays ov)
-                (forward-line)))))))))
+          (dolist (cmd-msg blame-cmd-res)
+            (unless (blamer--git-cmd-error-p cmd-msg)
+              (let* ((commit-info (blamer--parse-line-info cmd-msg))
+                     (popup-msg (blamer--create-popup-msg commit-info))
+                     (ov (progn
+                           (move-end-of-line nil)
+                           (make-overlay (point) (point) nil t t))))
+                (when popup-msg
+                  (overlay-put ov 'after-string (blamer--apply-bindings popup-msg commit-info))
+                  (overlay-put ov 'intangible t)
+                  (overlay-put ov 'window (get-buffer-window))
+                  (add-to-list 'blamer--overlays ov)
+                  (forward-line))))))))))
 
 (defun blamer--render-commit-info-with-delay ()
   "Render commit info with delay."
