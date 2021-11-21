@@ -138,7 +138,24 @@ For example, if we want to open magit diff by left click, and browse remote by r
                           ("<mouse-1>" . blamer-callback-show-commit-diff)))
 #+END_SRC
 
-
+Also, you can use [[https://github.com/emacsmirror/git-timemachine][timemachine]] or select the commit in the magit log: 
+#+BEGIN_SRC emacs-lisp
+  (defun blamer-callback-magit-log-file (commit-info)
+    (interactive)
+    (magit-log-buffer-file)
+    (let ((commit-hash (plist-get commit-info :commit-hash)))
+      (when commit-hash
+        (run-with-idle-timer 1 nil (lambda (commit-hash)
+                                     (goto-char (point-min))
+                                     (search-forward (substring commit-hash 0 7))
+                                     (set-mark (point-at-bol))
+                                     (goto-char (point-at-eol)))
+                             commit-hash))))
+  
+  (defun blamer-callback-timemachine (commit-info)
+    (interactive)
+    (git-timemachine))
+#+END_SRC
 * Contribute
 Run before push
 #+BEGIN_SRC bash
