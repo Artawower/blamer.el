@@ -274,14 +274,16 @@ author name by left click and copying commit hash by right click.
                                    date
                                    time
                                    &optional
-                                   offset)
+                                   offset
+                                   commit-info)
   "Format commit info into display message.
 COMMIT-HASH - hash of current commit.
 COMMIT-MESSAGE - message of current commit, can be null
 AUTHOR - name of commiter
 DATE - date in format YYYY-DD-MM
 TIME - time in format HH:MM:SS
-OFFSET - additional offset for commit message"
+OFFSET - additional offset for commit message
+COMMIT-INFO - all the commit information, for blamer--apply-bindings"
   (ignore commit-hash)
 
   (let* ((uncommitted (string= author "Not Committed Yet"))
@@ -296,6 +298,7 @@ OFFSET - additional offset for commit message"
                                                (a-merge (face-all-attributes 'blamer-face (selected-frame))
                                                         `((:background ,(blamer--get-background-color)))))
                                         'cursor t))
+         (formatted-message (blamer--apply-bindings formatted-message commit-info)) ;; apply bindings only to text, not offset
          (additional-offset (if blamer-offset-per-symbol
                                 (/ (string-width formatted-message) blamer-offset-per-symbol) 0))
          ;; NOTE https://github.com/Artawower/blamer.el/issues/8
@@ -360,7 +363,8 @@ Return nil if error."
                                                     commit-author
                                                     (plist-get commit-info :commit-date)
                                                     (plist-get commit-info :commit-time)
-                                                    offset)))
+                                                    offset
+                                                    commit-info)))
 
     (when (and commit-author (not (eq commit-author "")))
       popup-message)))
@@ -386,13 +390,15 @@ Return nil if error."
 
 (defun blamer--apply-bindings (text commit-info)
   "Apply defined bindings to TEXT and pass COMMIT-INFO to callback."
-  (let ((map (make-sparse-keymap)))
+  (let ((map (make-sparse-keymap))
+        (help-echo (mapconcat (lambda (bind) (format "%s - %s" (car bind) (cdr bind))) blamer-bindings "\n")))
+    
     (dolist (mapbind blamer-bindings)
       (define-key map (kbd (car mapbind))
         (lambda ()
           (interactive)
           (funcall (cdr mapbind) commit-info)))
-      (setq text (propertize text 'keymap map))))
+      (setq text (propertize text 'keymap map 'help-echo help-echo 'pointer 'hand))))
   text)
 
 (defun blamer--render ()
@@ -429,7 +435,7 @@ Return nil if error."
                            (move-end-of-line nil)
                            (make-overlay (point) (point) nil t t))))
                 (when popup-msg
-                  (overlay-put ov 'after-string (blamer--apply-bindings popup-msg commit-info))
+                  (overlay-put ov 'after-string popup-msg)
                   (overlay-put ov 'intangible t)
                   (overlay-put ov 'window (get-buffer-window))
                   (add-to-list 'blamer--overlays ov)
