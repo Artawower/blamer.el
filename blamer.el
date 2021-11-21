@@ -391,14 +391,16 @@ Return nil if error."
 (defun blamer--apply-bindings (text commit-info)
   "Apply defined bindings to TEXT and pass COMMIT-INFO to callback."
   (let ((map (make-sparse-keymap))
-        (help-echo (mapconcat (lambda (bind) (format "%s - %s" (car bind) (cdr bind))) blamer-bindings "\n")))
-    
+        (help-echo (if (> (length blamer-bindings) 0)
+                       (mapconcat (lambda (bind) (format "%s - %s" (car bind) (cdr bind))) blamer-bindings "\n")
+                     "Add custom mouse bindngs customizing blamer-bindings")))
+
     (dolist (mapbind blamer-bindings)
       (define-key map (kbd (car mapbind))
         (lambda ()
           (interactive)
-          (funcall (cdr mapbind) commit-info)))
-      (setq text (propertize text 'keymap map 'help-echo help-echo 'pointer 'hand))))
+          (funcall (cdr mapbind) commit-info))))
+    (setq text (propertize text 'keymap map 'help-echo help-echo 'pointer 'hand)))
   text)
 
 (defun blamer--render ()
