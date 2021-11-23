@@ -283,7 +283,7 @@ AUTHOR - name of commiter
 DATE - date in format YYYY-DD-MM
 TIME - time in format HH:MM:SS
 OFFSET - additional offset for commit message
-COMMIT-INFO - all the commit information, for blamer--apply-bindings"
+COMMIT-INFO - all the commit information, for `blamer--apply-bindings'"
   (ignore commit-hash)
 
   (let* ((uncommitted (string= author "Not Committed Yet"))
