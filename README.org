@@ -117,7 +117,8 @@ commit-info consist of:
 =:raw-commit-author= - raw author username if exist.
 =:commit-date= - date of commit. (string field)
 =:commit-time= - commit's time. (string field)
-=:commit-message= - message of commit. If not exist will be get from
+=:commit-message= - message of commit. If not exist will be get from =blamer-uncommitted-changes-message=
+=:raw-commit-message= - full message of commit.
 For example, if we want to open magit diff by left click, and browse remote by right click we can use this code (magit and forge have to be installed):
 
 #+BEGIN_SRC emacs-lisp
