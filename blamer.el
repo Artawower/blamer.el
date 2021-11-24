@@ -183,7 +183,7 @@ author name by left click and copying commit hash by right click.
   :type '(choice (const :tag "Keybindings prompt" blamer-tooltip-keybindings)
                  (const :tag "Commit message" blamer-tooltip-commit-message)
                  (const :tag "Info about author" blamer-tooltip-author-info)
-                 (const :tag "No tooltip" blamer-tooltip-none)))
+                 (const :tag "No tooltip" nil)))
 
 (defvar blamer-idle-timer nil
   "Current timer before commit info showing.")
@@ -206,30 +206,29 @@ author name by left click and copying commit hash by right click.
 (defvar-local blamer--current-author nil
   "Git.name for current repository.")
 
-(defun blamer-tooltip-none(_commit-info)
-  "This function can be use as `blamer-tooltip-function', to not show anything."
-  nil)
-
-(defun blamer-tooltip-commit-message(commit-info)
+(defun blamer-tooltip-commit-message (commit-info)
   "This function can be use as `blamer-tooltip-function', to show the commit message from COMMIT-INFO."
   (plist-get commit-info :raw-commit-message))
 
-(defun blamer-tooltip-author-info(commit-info)
+(defun blamer-tooltip-author-info (commit-info)
   "This function can be use as `blamer-tooltip-function', to show the author from COMMIT-INFO."
   (format "%s (%s)" (plist-get commit-info :commit-author) (plist-get commit-info :raw-commit-author)))
 
-(defun blamer-tooltip-keybindings(_commit-info)
+(defun blamer-tooltip-keybindings (_commit-info)
   "This function can be use as `blamer-tooltip-function', to show the available `blamer-bindings'."
   (if (> (length blamer-bindings) 0)
       (mapconcat (lambda (bind) (format "%s - %s" (car bind) (cdr bind))) blamer-bindings "\n")
-    "Add custom mouse bindngs customizing blamer-bindings"))
+    "Add custom mouse bindings customizing blamer-bindings"))
 
-(defun blamer--get-tooltip(commit-info)
+(defun blamer--apply-tooltip(text commit-info)
   "Compute the toolip from `blamer-tooltip-function' and COMMIT-INFO."
-  (if (and blamer-tooltip-function (functionp blamer-tooltip-function))
-      (funcall blamer-tooltip-function commit-info)
-    "Customize blamer-tooltip-function"))
-  
+  (let ((help-echo (if (and blamer-tooltip-function (functionp blamer-tooltip-function))
+                          (funcall blamer-tooltip-function commit-info)
+                        nil)))
+    (if help-echo
+        (propertize text 'help-echo help-echo 'pointer 'hand)
+      text)))
+
 (defun blamer--git-exist-p ()
   "Return t if .git exist."
   (let* ((git-exist-stdout (shell-command-to-string blamer--git-repo-cmd)))
@@ -331,6 +330,8 @@ COMMIT-INFO - all the commit information, for `blamer--apply-bindings'"
                                                (a-merge (face-all-attributes 'blamer-face (selected-frame))
                                                         `((:background ,(blamer--get-background-color)))))
                                         'cursor t))
+         ;; I don't know, might be we can combine this two operations, cause its also redundant a bit
+         (formatted-message (blamer--apply-tooltip formatted-message commit-info))
          (formatted-message (blamer--apply-bindings formatted-message commit-info)) ;; apply bindings only to text, not offset
          (additional-offset (if blamer-offset-per-symbol
                                 (/ (string-width formatted-message) blamer-offset-per-symbol) 0))
@@ -426,15 +427,14 @@ Return nil if error."
 
 (defun blamer--apply-bindings (text commit-info)
   "Apply defined bindings to TEXT and pass COMMIT-INFO to callback."
-  (let ((map (make-sparse-keymap))
-        (help-echo (blamer--get-tooltip commit-info)))
+  (let ((map (make-sparse-keymap)))
 
     (dolist (mapbind blamer-bindings)
       (define-key map (kbd (car mapbind))
         (lambda ()
           (interactive)
           (funcall (cdr mapbind) commit-info))))
-    (setq text (propertize text 'keymap map 'help-echo help-echo 'pointer 'hand)))
+    (setq text (propertize text 'keymap map)))
   text)
 
 (defun blamer--render ()
