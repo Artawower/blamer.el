@@ -222,7 +222,7 @@ author name by left click and copying commit hash by right click.
   "This function can be use as `blamer-tooltip-function', to show the available `blamer-bindings'."
   (if (> (length blamer-bindings) 0)
       (mapconcat (lambda (bind) (format "%s - %s" (car bind) (cdr bind))) blamer-bindings "\n")
-    "Add custom mouse bindngs customizing blamer-bindings"))
+    nil))
 
 (defun blamer--get-tooltip(commit-info)
   "Compute the toolip from `blamer-tooltip-function' and COMMIT-INFO."
