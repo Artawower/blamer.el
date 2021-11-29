@@ -220,15 +220,6 @@ author name by left click and copying commit hash by right click.
       (mapconcat (lambda (bind) (format "%s - %s" (car bind) (cdr bind))) blamer-bindings "\n")
      nil))
 
-(defun blamer--apply-tooltip(text commit-info)
-  "Compute the toolip from `blamer-tooltip-function' and COMMIT-INFO."
-  (let ((help-echo (if (and blamer-tooltip-function (functionp blamer-tooltip-function))
-                          (funcall blamer-tooltip-function commit-info)
-                        nil)))
-    (if help-echo
-        (propertize text 'help-echo help-echo 'pointer 'hand)
-      text)))
-
 (defun blamer--git-exist-p ()
   "Return t if .git exist."
   (let* ((git-exist-stdout (shell-command-to-string blamer--git-repo-cmd)))
@@ -330,9 +321,8 @@ COMMIT-INFO - all the commit information, for `blamer--apply-bindings'"
                                                (a-merge (face-all-attributes 'blamer-face (selected-frame))
                                                         `((:background ,(blamer--get-background-color)))))
                                         'cursor t))
-         ;; I don't know, might be we can combine this two operations, cause its also redundant a bit
          (formatted-message (blamer--apply-tooltip formatted-message commit-info))
-         (formatted-message (blamer--apply-bindings formatted-message commit-info)) ;; apply bindings only to text, not offset
+         (formatted-message (blamer--apply-bindings formatted-message commit-info))
          (additional-offset (if blamer-offset-per-symbol
                                 (/ (string-width formatted-message) blamer-offset-per-symbol) 0))
          ;; NOTE https://github.com/Artawower/blamer.el/issues/8
@@ -425,10 +415,18 @@ Return nil if error."
        (tramp-dissect-file-name filename))
     filename))
 
+(defun blamer--apply-tooltip(text commit-info)
+  "Compute the toolip from `blamer-tooltip-function' and COMMIT-INFO."
+  (let ((help-echo (if (and blamer-tooltip-function (functionp blamer-tooltip-function))
+                          (funcall blamer-tooltip-function commit-info)
+                        nil)))
+    (if help-echo
+        (propertize text 'help-echo help-echo 'pointer 'hand)
+      text)))
+
 (defun blamer--apply-bindings (text commit-info)
   "Apply defined bindings to TEXT and pass COMMIT-INFO to callback."
   (let ((map (make-sparse-keymap)))
-
     (dolist (mapbind blamer-bindings)
       (define-key map (kbd (car mapbind))
         (lambda ()
