@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (a "1.0.0"))
-;; Version: 0.3.3
+;; Version: 0.3.4
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -366,11 +366,9 @@ Return nil if error."
                           raw-commit-author))
          (commit-date (match-string 3 blame-msg))
          (commit-time (match-string 4 blame-msg))
-         (commit-messages (when blamer-commit-formatter
-                            (blamer--get-commit-message commit-hash)))
-         (commit-message (nth 0 commit-messages))
+         (commit-messages (blamer--get-commit-message commit-hash))
+         (commit-message (when blamer-commit-formatter (nth 0 commit-messages)))
          (raw-commit-message (nth 1 commit-messages))
-
          (parsed-commit-info `(:commit-hash ,commit-hash
                                :commit-author ,commit-author
                                :commit-date ,commit-date
