@@ -166,6 +166,7 @@ Callback function applying plist argument:
 :commit-time - commit's time. (string field)
 :commit-message - message of commit. If not exist will be get from
 `blamer-uncommitted-changes-message' variable.
+:raw-commit-message - Full message of commit.
 
 For example you can pass such bindings for message
 author name by left click and copying commit hash by right click.
@@ -175,6 +176,14 @@ author name by left click and copying commit hash by right click.
   (<mapvar> . (lambda (commit-info) (kill-new (plist-get :commit-hash)))))"
   :group 'blamer
   :type 'alist)
+
+(defcustom blamer-tooltip-function nil
+  "Function to compute the tooltip contents of the popup message."
+  :group 'blamer
+  :type '(choice (const :tag "Keybindings prompt" blamer-tooltip-keybindings)
+                 (const :tag "Commit message" blamer-tooltip-commit-message)
+                 (const :tag "Info about author" blamer-tooltip-author-info)
+                 (const :tag "No tooltip" nil)))
 
 (defvar blamer-idle-timer nil
   "Current timer before commit info showing.")
@@ -196,6 +205,20 @@ author name by left click and copying commit hash by right click.
 
 (defvar-local blamer--current-author nil
   "Git.name for current repository.")
+
+(defun blamer-tooltip-commit-message (commit-info)
+  "This function can be use as `blamer-tooltip-function', to show the commit message from COMMIT-INFO."
+  (plist-get commit-info :raw-commit-message))
+
+(defun blamer-tooltip-author-info (commit-info)
+  "This function can be use as `blamer-tooltip-function', to show the author from COMMIT-INFO."
+  (format "%s (%s)" (plist-get commit-info :commit-author) (plist-get commit-info :raw-commit-author)))
+
+(defun blamer-tooltip-keybindings (_commit-info)
+  "This function can be use as `blamer-tooltip-function', to show the available `blamer-bindings'."
+  (if (> (length blamer-bindings) 0)
+      (mapconcat (lambda (bind) (format "%s - %s" (car bind) (cdr bind))) blamer-bindings "\n")
+     nil))
 
 (defun blamer--git-exist-p ()
   "Return t if .git exist."
@@ -274,14 +297,16 @@ author name by left click and copying commit hash by right click.
                                    date
                                    time
                                    &optional
-                                   offset)
+                                   offset
+                                   commit-info)
   "Format commit info into display message.
 COMMIT-HASH - hash of current commit.
 COMMIT-MESSAGE - message of current commit, can be null
 AUTHOR - name of commiter
 DATE - date in format YYYY-DD-MM
 TIME - time in format HH:MM:SS
-OFFSET - additional offset for commit message"
+OFFSET - additional offset for commit message
+COMMIT-INFO - all the commit information, for `blamer--apply-bindings'"
   (ignore commit-hash)
 
   (let* ((uncommitted (string= author "Not Committed Yet"))
@@ -296,6 +321,8 @@ OFFSET - additional offset for commit message"
                                                (a-merge (face-all-attributes 'blamer-face (selected-frame))
                                                         `((:background ,(blamer--get-background-color)))))
                                         'cursor t))
+         (formatted-message (blamer--apply-tooltip formatted-message commit-info))
+         (formatted-message (blamer--apply-bindings formatted-message commit-info))
          (additional-offset (if blamer-offset-per-symbol
                                 (/ (string-width formatted-message) blamer-offset-per-symbol) 0))
          ;; NOTE https://github.com/Artawower/blamer.el/issues/8
@@ -327,7 +354,7 @@ Return nil if error."
       (setq commit-message (match-string 1 git-commit-res))
       (setq commit-message (replace-regexp-in-string "\n" " " commit-message))
       (setq commit-message (string-trim commit-message))
-      (truncate-string-to-width commit-message blamer-max-commit-message-length nil nil "..."))))
+      (list (truncate-string-to-width commit-message blamer-max-commit-message-length nil nil "...") commit-message))))
 
 (defun blamer--parse-line-info (blame-msg)
   "Parse BLAME-MSG and create a plist."
@@ -339,15 +366,18 @@ Return nil if error."
                           raw-commit-author))
          (commit-date (match-string 3 blame-msg))
          (commit-time (match-string 4 blame-msg))
-         (commit-message (when blamer-commit-formatter
-                           (blamer--get-commit-message commit-hash)))
+         (commit-messages (when blamer-commit-formatter
+                            (blamer--get-commit-message commit-hash)))
+         (commit-message (nth 0 commit-messages))
+         (raw-commit-message (nth 1 commit-messages))
 
          (parsed-commit-info `(:commit-hash ,commit-hash
                                :commit-author ,commit-author
                                :commit-date ,commit-date
                                :commit-time ,commit-time
                                :raw-commit-author ,raw-commit-author
-                               :commit-message ,commit-message)))
+                               :commit-message ,commit-message
+                               :raw-commit-message ,raw-commit-message)))
 
     parsed-commit-info))
 
@@ -360,7 +390,8 @@ Return nil if error."
                                                     commit-author
                                                     (plist-get commit-info :commit-date)
                                                     (plist-get commit-info :commit-time)
-                                                    offset)))
+                                                    offset
+                                                    commit-info)))
 
     (when (and commit-author (not (eq commit-author "")))
       popup-message)))
@@ -384,6 +415,15 @@ Return nil if error."
        (tramp-dissect-file-name filename))
     filename))
 
+(defun blamer--apply-tooltip(text commit-info)
+  "Compute the toolip from `blamer-tooltip-function' and COMMIT-INFO."
+  (let ((help-echo (if (and blamer-tooltip-function (functionp blamer-tooltip-function))
+                          (funcall blamer-tooltip-function commit-info)
+                        nil)))
+    (if help-echo
+        (propertize text 'help-echo help-echo 'pointer 'hand)
+      text)))
+
 (defun blamer--apply-bindings (text commit-info)
   "Apply defined bindings to TEXT and pass COMMIT-INFO to callback."
   (let ((map (make-sparse-keymap)))
@@ -391,8 +431,8 @@ Return nil if error."
       (define-key map (kbd (car mapbind))
         (lambda ()
           (interactive)
-          (funcall (cdr mapbind) commit-info)))
-      (setq text (propertize text 'keymap map))))
+          (funcall (cdr mapbind) commit-info))))
+    (setq text (propertize text 'keymap map)))
   text)
 
 (defun blamer--render ()
@@ -429,7 +469,7 @@ Return nil if error."
                            (move-end-of-line nil)
                            (make-overlay (point) (point) nil t t))))
                 (when popup-msg
-                  (overlay-put ov 'after-string (blamer--apply-bindings popup-msg commit-info))
+                  (overlay-put ov 'after-string popup-msg)
                   (overlay-put ov 'intangible t)
                   (overlay-put ov 'window (get-buffer-window))
                   (add-to-list 'blamer--overlays ov)

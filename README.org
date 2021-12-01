@@ -117,7 +117,8 @@ commit-info consist of:
 =:raw-commit-author= - raw author username if exist.
 =:commit-date= - date of commit. (string field)
 =:commit-time= - commit's time. (string field)
-=:commit-message= - message of commit. If not exist will be get from
+=:commit-message= - message of commit. If not exist will be get from =blamer-uncommitted-changes-message=
+=:raw-commit-message= - full message of commit.
 For example, if we want to open magit diff by left click, and browse remote by right click we can use this code (magit and forge have to be installed):
 
 #+BEGIN_SRC emacs-lisp
@@ -138,7 +139,24 @@ For example, if we want to open magit diff by left click, and browse remote by r
                           ("<mouse-1>" . blamer-callback-show-commit-diff)))
 #+END_SRC
 
-
+Also, you can use [[https://github.com/emacsmirror/git-timemachine][timemachine]] or select the commit in the magit log: 
+#+BEGIN_SRC emacs-lisp
+  (defun blamer-callback-magit-log-file (commit-info)
+    (interactive)
+    (magit-log-buffer-file)
+    (let ((commit-hash (plist-get commit-info :commit-hash)))
+      (when commit-hash
+        (run-with-idle-timer 1 nil (lambda (commit-hash)
+                                     (goto-char (point-min))
+                                     (search-forward (substring commit-hash 0 7))
+                                     (set-mark (point-at-bol))
+                                     (goto-char (point-at-eol)))
+                             commit-hash))))
+  
+  (defun blamer-callback-timemachine (commit-info)
+    (interactive)
+    (git-timemachine))
+#+END_SRC
 * Contribute
 Run before push
 #+BEGIN_SRC bash
