@@ -107,6 +107,27 @@ If line has length more then this value, text will be truncated
 **** Prefer blamer face
 If you want to disable automatic background detection you can always use blamer face
 =(setq blamer-smart-background-p nil)=
+**** Tooltip
+You can turn on a tooltip when hovering over a commit, by settings =blamer-tooltip-function=
+This variably can apply default functions
+=(setq blamer-tooltip-function 'blamer-tooltip-keybindings)= - will show keybindings for current commit message
+=(setq blamer-tooltip-function 'blamer-tooltip-commit-message)= - show commit message about current line
+(it could be helpfull when blamer-commit-formatter is empty)
+=(setq blamer-tooltip-function 'blamer-tooltip-author-info)= - show information about author
+Also you can write own function with first argumens as =commit-info= plist, or set this variable to null, that mean tooltip is disabled
+
+For example, you can write function for showing commit datetime inside tooltip:
+#+BEGIN_SRC emacs-lisp
+(defun my-blamer-tooltip-func (commit-info)
+  (let ((commit-date (plist-get commit-info :commit-date))
+        (commit-time (plist-get commit-info :commit-time)))
+    (message "%s" commit-info)
+    (format "%s - %s" commit-date commit-time)))
+
+(setq blamer-tooltip-function 'my-blamer-tooltip-func
+#+END_SRC
+
+
 
 * Interactive binding
 You can bind the mouse click event and pass custom handler. Where the handler is callback function with commit-info arg.
@@ -117,7 +138,8 @@ commit-info consist of:
 =:raw-commit-author= - raw author username if exist.
 =:commit-date= - date of commit. (string field)
 =:commit-time= - commit's time. (string field)
-=:commit-message= - message of commit. If not exist will be get from
+=:commit-message= - message of commit. If not exist will be get from =blamer-uncommitted-changes-message=
+=:raw-commit-message= - full message of commit.
 For example, if we want to open magit diff by left click, and browse remote by right click we can use this code (magit and forge have to be installed):
 
 #+BEGIN_SRC emacs-lisp
@@ -138,14 +160,31 @@ For example, if we want to open magit diff by left click, and browse remote by r
                           ("<mouse-1>" . blamer-callback-show-commit-diff)))
 #+END_SRC
 
-
+Also, you can use [[https://github.com/emacsmirror/git-timemachine][timemachine]] or select the commit in the magit log: 
+#+BEGIN_SRC emacs-lisp
+  (defun blamer-callback-magit-log-file (commit-info)
+    (interactive)
+    (magit-log-buffer-file)
+    (let ((commit-hash (plist-get commit-info :commit-hash)))
+      (when commit-hash
+        (run-with-idle-timer 1 nil (lambda (commit-hash)
+                                     (goto-char (point-min))
+                                     (search-forward (substring commit-hash 0 7))
+                                     (set-mark (point-at-bol))
+                                     (goto-char (point-at-eol)))
+                             commit-hash))))
+  
+  (defun blamer-callback-timemachine (commit-info)
+    (interactive)
+    (git-timemachine))
+#+END_SRC
 * Contribute
 Run before push
 #+BEGIN_SRC bash
 emacs -batch -l ert -l blamer.el -l test.el -f ert-run-tests-batch-and-exit
 #+END_SRC
 
-* TODO Blamer.el plans [15/16]
+* TODO Blamer.el plans [16/16]
 - [X] Get necessary information about current line under cursor
 - [X] Get commit info by current hash (if necessary)
 - [X] Get background color if hl-mode is exist and enabled (transparency)
@@ -161,4 +200,4 @@ emacs -batch -l ert -l blamer.el -l test.el -f ert-run-tests-batch-and-exit
 - [X] Add support for global mode
 - [X] Add support for multi line selection
 - [X] Canonical blamer format + templates.
-- [ ] Clickable annotations
+- [X] Clickable annotations
