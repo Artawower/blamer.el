@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (a "1.0.0"))
-;; Version: 0.3.4
+;; Version: 0.3.5
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -44,7 +44,7 @@
 3 - date
 3 - time")
 
-(defconst blamer--commit-message-regexp "\n\n[\s]+\\(?1:[^$]+\\):?"
+(defconst blamer--commit-message-regexp "\n\n[\s]+\\(?1:[^\']+\\):?"
   "Regexp for commit message parsing.")
 
 (defconst blamer--git-author-cmd "git config --get user.name"
