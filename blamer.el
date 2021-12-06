@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (a "1.0.0"))
-;; Version: 0.3.5
+;; Version: 0.3.6
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -58,6 +58,9 @@
 
 (defconst blamer--git-commit-message "git log -n1 %s"
   "Command for get commit message.")
+
+(defconst blamer--current-time-text "Now"
+  "Text for lines that were created right now.")
 
 (defgroup blamer nil
   "Show commit info at the end of a current line."
@@ -218,7 +221,7 @@ author name by left click and copying commit hash by right click.
   "This function can be use as `blamer-tooltip-function', to show the available `blamer-bindings'."
   (if (> (length blamer-bindings) 0)
       (mapconcat (lambda (bind) (format "%s - %s" (car bind) (cdr bind))) blamer-bindings "\n")
-     nil))
+    nil))
 
 (defun blamer--git-exist-p ()
   "Return t if .git exist."
@@ -251,7 +254,7 @@ author name by left click and copying commit hash by right click.
          (months-ago (if (eq days-ago 0) 0 (floor (/ days-ago 30))))
          (years-ago (if (eq months-ago 0) 0 (floor (/ months-ago 12)))))
 
-    (cond ((or (time-equal-p now parsed-time) (< seconds-ago 60)) "Now")
+    (cond ((or (time-equal-p now parsed-time) (< seconds-ago 60)) blamer--current-time-text)
           ((< minutes-ago 60) (format "%s minutes ago" minutes-ago))
           ((= hours-ago 1) (format "Hour ago"))
           ((< hours-ago 24) (format "%s hours ago" hours-ago))
@@ -313,7 +316,7 @@ COMMIT-INFO - all the commit information, for `blamer--apply-bindings'"
          (author (if uncommitted blamer-self-author-name author))
          (commit-message (if uncommitted blamer-uncommitted-changes-message commit-message))
          (formatted-message (blamer--format-entire-message (concat (blamer--format-author author)
-                                                                   (if (not uncommitted) (blamer--format-datetime date time) "")
+                                                                   (blamer--format-datetime date time)
                                                                    (blamer--format-commit-message commit-message))))
 
          (formatted-message (propertize formatted-message
@@ -414,10 +417,10 @@ Return nil if error."
     filename))
 
 (defun blamer--apply-tooltip(text commit-info)
-  "Compute the toolip from `blamer-tooltip-function' and COMMIT-INFO."
+  "Compute the toolip from `blamer-tooltip-function', TEXT and COMMIT-INFO."
   (let ((help-echo (if (and blamer-tooltip-function (functionp blamer-tooltip-function))
-                          (funcall blamer-tooltip-function commit-info)
-                        nil)))
+                       (funcall blamer-tooltip-function commit-info)
+                     nil)))
     (if help-echo
         (propertize text 'help-echo help-echo 'pointer 'hand)
       text)))
