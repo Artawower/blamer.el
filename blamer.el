@@ -374,12 +374,12 @@ Return nil if error."
          (commit-message (when blamer-commit-formatter (nth 0 commit-messages)))
          (raw-commit-message (nth 1 commit-messages))
          (parsed-commit-info `(:commit-hash ,commit-hash
-                                            :commit-author ,commit-author
-                                            :commit-date ,commit-date
-                                            :commit-time ,commit-time
-                                            :raw-commit-author ,raw-commit-author
-                                            :commit-message ,commit-message
-                                            :raw-commit-message ,raw-commit-message)))
+                               :commit-author ,commit-author
+                               :commit-date ,commit-date
+                               :commit-time ,commit-time
+                               :raw-commit-author ,raw-commit-author
+                               :commit-message ,commit-message
+                               :raw-commit-message ,raw-commit-message)))
 
     parsed-commit-info))
 
