@@ -118,7 +118,8 @@ Will add additional space for each BLAMER-OFFSET-PER-SYMBOL"
                  (const :tag "Visual and selected" both)
                  (const :tag "Selected only" selected)))
 
-(defcustom blamer-self-author-name "You"
+(defcustom blamer-self-author-name (if (string-empty-p user-full-name) "You"
+                                     user-full-name)
   "Message for commits where you are author."
   :group 'blamer
   :type 'string)
