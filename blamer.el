@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (a "1.0.0"))
-;; Version: 0.3.6
+;; Version: 0.3.7
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -477,13 +477,18 @@ Return nil if error."
                   (add-to-list 'blamer--overlays ov)
                   (forward-line))))))))))
 
+(defun blamer--safety-render ()
+  "Function for checking current active blamer type before rendering with delay."
+  (unless (and (eq blamer-type 'visual) (use-region-p))
+    (blamer--render)))
+
 (defun blamer--render-commit-info-with-delay ()
   "Render commit info with delay."
   (when blamer-idle-timer
     (cancel-timer blamer-idle-timer))
 
   (setq blamer-idle-timer
-        (run-with-idle-timer (or blamer-idle-time 0) nil 'blamer--render)))
+        (run-with-idle-timer (or blamer-idle-time 0) nil 'blamer--safety-render)))
 
 (defun blamer--preserve-state ()
   "Preserve current editor state for next iteration."
