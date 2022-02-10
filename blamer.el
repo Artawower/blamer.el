@@ -112,9 +112,11 @@ Will add additional space for each BLAMER-OFFSET-PER-SYMBOL"
   "Type of blamer.
 'visual - show blame only for current line
 'selected - show blame only for selected line
+'single-pretty - show commit info inside pretty overlay
 'both - both of them"
   :group 'blamer
   :type '(choice (const :tag "Visual only" visual)
+                 (connst :tag "Single pretty" single-pretty)
                  (const :tag "Visual and selected" both)
                  (const :tag "Selected only" selected)))
 
@@ -418,7 +420,7 @@ Return nil if error."
     filename))
 
 (defun blamer--apply-tooltip(text commit-info)
-  "Compute the toolip from `blamer-tooltip-function', TEXT and COMMIT-INFO."
+  "Compute the tooltip from `blamer-tooltip-function', TEXT and COMMIT-INFO."
   (let ((help-echo (if (and blamer-tooltip-function (functionp blamer-tooltip-function))
                        (funcall blamer-tooltip-function commit-info)
                      nil)))
@@ -436,6 +438,21 @@ Return nil if error."
           (funcall (cdr mapbind) commit-info))))
     (setq text (propertize text 'keymap map)))
   text)
+
+(defun blamer--render-line-overlay (commit-info)
+  "Render COMMIT-INFO overlay."
+  (if (eq blamer-type 'single-pretty)
+      (message "Okay, should be implemented here")
+
+    ;; NOTE: its a simple overlay at the right side of current line
+    (when-let ((ov (progn (move-end-of-line nil)
+                          (make-overlay (point) (point) nil t t)))
+               (popup-msg (blamer--create-popup-msg commit-info)))
+
+      (overlay-put ov 'after-string popup-msg)
+      (overlay-put ov 'intangible t)
+      (overlay-put ov 'window (get-buffer-window))
+      (add-to-list 'blamer--overlays ov))))
 
 (defun blamer--render ()
   "Render text about current line commit status."
@@ -466,21 +483,16 @@ Return nil if error."
 
           (dolist (cmd-msg blame-cmd-res)
             (unless (blamer--git-cmd-error-p cmd-msg)
-              (let* ((commit-info (blamer--parse-line-info cmd-msg))
-                     (popup-msg (blamer--create-popup-msg commit-info))
-                     (ov (progn
-                           (move-end-of-line nil)
-                           (make-overlay (point) (point) nil t t))))
-                (when popup-msg
-                  (overlay-put ov 'after-string popup-msg)
-                  (overlay-put ov 'intangible t)
-                  (overlay-put ov 'window (get-buffer-window))
-                  (add-to-list 'blamer--overlays ov)
-                  (forward-line))))))))))
+              (let ((commit-info (blamer--parse-line-info cmd-msg)))
+                (blamer--render-line-overlay commit-info)
+                (forward-line)))))))))
 
 (defun blamer--safety-render ()
   "Function for checking current active blamer type before rendering with delay."
-  (unless (and (eq blamer-type 'visual) (use-region-p))
+  (unless (and
+           (or (eq blamer-type 'single-pretty)
+               (eq blamer-type 'visual))
+           (use-region-p))
     (blamer--render)))
 
 (defun blamer--render-commit-info-with-delay ()
