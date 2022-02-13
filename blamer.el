@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (a "1.0.0"))
-;; Version: 0.3.8
+;; Version: 0.3.9
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -226,7 +226,8 @@ author name by left click and copying commit hash by right click.
 
 (defun blamer--git-exist-p ()
   "Return t if .git exist."
-  (let* ((git-exist-stdout (shell-command-to-string blamer--git-repo-cmd)))
+  (when-let* ((file-name (blamer--get-local-name (buffer-file-name)))
+              (git-exist-stdout (shell-command-to-string blamer--git-repo-cmd)))
     (string-match "^true" git-exist-stdout)))
 
 (defun blamer--clear-overlay ()
@@ -453,10 +454,10 @@ Return nil if error."
                                       (line-number-at-pos))
                                   (line-number-at-pos)))
              (file-name (blamer--get-local-name (buffer-file-name)))
-             (file-name (replace-regexp-in-string " " "\\\\\  " file-name))
+             (file-name (when file-name (replace-regexp-in-string " " "\\\\\  " file-name)))
              (cmd (format blamer--git-blame-cmd start-line-number end-line-number file-name))
-             (blame-cmd-res (shell-command-to-string cmd))
-             (blame-cmd-res (butlast (split-string blame-cmd-res "\n"))))
+             (blame-cmd-res (when file-name (shell-command-to-string cmd)))
+             (blame-cmd-res (when blame-cmd-res (butlast (split-string blame-cmd-res "\n")))))
 
         (blamer--clear-overlay)
 
