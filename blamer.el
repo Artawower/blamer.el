@@ -27,6 +27,7 @@
 ;;; Code:
 
 (require 'files)
+(require 'seq)
 (require 'subr-x)
 (require 'simple)
 (require 'time-date)
@@ -131,9 +132,18 @@ Will add additional space for each BLAMER-OFFSET-PER-SYMBOL"
   :group 'blamer
   :type 'integer)
 
+(defcustom blamer-border-lines '(?╭ ?─ ?╮ ?│ ?╯ ?╰ )
+  "List of lines and borders. When value is nil, borders will not preset.
+Be careful! This config highly coupled with your current face!
+
+Alternative preset: '(?┌ ?─ ?┐ ?│ ?┘ ?└)"
+  :group 'blamer
+  :type 'alist)
+
 (defcustom blamer-max-commit-message-length 30
   "Max length of commit message.
-Commit message with more characters will be truncated with ellipsis at the end"
+Commit message with more characters will be truncated with ellipsis at the end.
+Also, when `blamer-type' is single-pretty this value is used for max tooltip length."
   :group 'blamer
   :type 'integer)
 
@@ -439,10 +449,57 @@ Return nil if error."
     (setq text (propertize text 'keymap map)))
   text)
 
+(defun blamer--format-pretty-tooltip (msgs)
+  "Draw a pretty tooltip from MSGS alist with respecting max possible length.
+Return cons of result and count of lines."
+  (let* ((enable-borders-p blamer-border-lines)
+         (render-length (- blamer-max-commit-message-length 2))
+         (top-left-corner (when enable-borders-p (list (nth 0 blamer-border-lines))))
+         (border-horizontal-line (when enable-borders-p (make-string render-length (nth 1 blamer-border-lines))))
+         (top-right-corner (when enable-borders-p (list (nth 2 blamer-border-lines))))
+         (border-vertical-line (when enable-borders-p (list (nth 3 blamer-border-lines))))
+         (bottom-right-corner (when enable-borders-p (list (nth 4 blamer-border-lines))))
+         (bottom-left-corner (when enable-borders-p (list (nth 5 blamer-border-lines))))
+         (res (concat "\n" top-left-corner border-horizontal-line top-right-corner "\n"))
+         splited-msgs)
+
+    (dolist (m msgs)
+      (setq splited-msgs (append splited-msgs (seq-partition m render-length))))
+
+    (message "spl: %s" splited-msgs)
+
+    (dolist (m splited-msgs)
+      (setq res (concat res
+                        border-vertical-line
+                        m
+                        (when (< (length m) render-length) (make-string (- render-length (length m)) ? ))
+                        border-vertical-line "\n")))
+
+    (setq res (concat res bottom-left-corner border-horizontal-line bottom-right-corner))
+
+    res))
+
 (defun blamer--render-line-overlay (commit-info)
   "Render COMMIT-INFO overlay."
+  (message "is single ? %s" (eq blamer-type 'single-pretty))
   (if (eq blamer-type 'single-pretty)
-      (message "Okay, should be implemented here")
+
+      (save-excursion
+        (message "Okay, should be implemented here")
+        ;; (forward-line)
+        (beginning-of-line)
+        (let* ((beg (point))
+               (ov (progn (move-end-of-line nil)
+                          (make-overlay (point) (point) nil t t)))
+
+               (msg (blamer--format-pretty-tooltip `(,(plist-get commit-info :commit-author)
+                                                     ,(plist-get commit-info :commit-message)))))
+
+          (overlay-put ov 'after-string msg)
+          (overlay-put ov 'intangible t)
+          (overlay-put ov 'window (get-buffer-window))
+          (add-to-list 'blamer--overlays ov)))
+
 
     ;; NOTE: its a simple overlay at the right side of current line
     (when-let ((ov (progn (move-end-of-line nil)
@@ -523,6 +580,7 @@ Return nil if error."
     (when (and (not long-line-p)
                (or (eq blamer-type 'both)
                    (and (eq blamer-type 'visual) (not (use-region-p)))
+                   (and (eq blamer-type 'single-pretty) (not (use-region-p)))
                    (and (eq blamer-type 'selected) (use-region-p)))
                (or (not blamer--previous-line-number)
                    (not (eq blamer--previous-window-width (window-width)))
