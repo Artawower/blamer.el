@@ -171,6 +171,27 @@ If not will use background from `blamer-face'"
   "Face for blamer info."
   :group 'blamer)
 
+(defface blamer-pretty-border-face
+  '((t :foreground "#7a88cf"
+       :background nil))
+  "Face for pretty blamer borders."
+  :group 'blamer)
+
+(defface blamer-pretty-commit-message-face
+    '((t :inherit font-lock-string-face))
+    "Face for pretty commit messages."
+    :group 'blamer)
+
+(defface blamer-pretty-meta-keywords-face
+    '((t :inherit font-lock-constant-face))
+    "Face for pretty keywords."
+    :group 'blamer)
+
+(defface blamer-pretty-meta-data-face
+    '((t :foreground "#5B6268"))
+    "Face for pretty meta information."
+    :group 'blamer)
+
 (defcustom blamer-bindings nil
   "List of bindings.
 
@@ -359,7 +380,7 @@ COMMIT-INFO - all the commit information, for `blamer--apply-bindings'"
 
     (concat alignment-text formatted-message)))
 
-(defun blamer--get-commit-message (hash)
+(defun blamer--get-commit-messages (hash)
   "Get commit message by provided HASH.
 Return nil if error."
   (let* ((git-commit-res (shell-command-to-string (format blamer--git-commit-message hash)))
@@ -368,9 +389,7 @@ Return nil if error."
     (unless has-error
       (string-match blamer--commit-message-regexp git-commit-res)
       (setq commit-message (match-string 1 git-commit-res))
-      (setq commit-message (replace-regexp-in-string "\n" " " commit-message))
-      (setq commit-message (string-trim commit-message))
-      (list (truncate-string-to-width commit-message blamer-max-commit-message-length nil nil "...") commit-message))))
+      (split-string commit-message "\n"))))
 
 (defun blamer--parse-line-info (blame-msg)
   "Parse BLAME-MSG and create a plist."
@@ -382,8 +401,14 @@ Return nil if error."
                           raw-commit-author))
          (commit-date (match-string 3 blame-msg))
          (commit-time (match-string 4 blame-msg))
-         (commit-messages (blamer--get-commit-message commit-hash))
-         (commit-message (when blamer-commit-formatter (nth 0 commit-messages)))
+         (commit-messages (blamer--get-commit-messages commit-hash))
+         (commit-message (car commit-messages))
+         (commit-message (when commit-message (string-trim commit-message)))
+         (commit-message (when (and blamer-commit-formatter commit-message)
+                           (truncate-string-to-width
+                            commit-message
+                            blamer-max-commit-message-length nil nil "...")))
+         (commit-description (cdr commit-messages))
          (raw-commit-message (nth 1 commit-messages))
          (parsed-commit-info `(:commit-hash ,commit-hash
                                :commit-author ,commit-author
@@ -391,6 +416,7 @@ Return nil if error."
                                :commit-time ,commit-time
                                :raw-commit-author ,raw-commit-author
                                :commit-message ,commit-message
+                               :commit-description ,commit-description
                                :raw-commit-message ,raw-commit-message)))
 
     parsed-commit-info))
@@ -449,56 +475,90 @@ Return nil if error."
     (setq text (propertize text 'keymap map)))
   text)
 
+(defun blamer--prettify-border (border)
+  "Apply font face for pretty-string BORDER."
+  (propertize border 'face 'blamer-pretty-border-face))
+
+(defun blamer--prettify-keyword (keyword)
+  "Apply font face for KEYWORD of pretty popup."
+  (propertize keyword 'face 'blamer-pretty-meta-keywords-face))
+
+(defun blamer--prettify-meta-data (meta-data)
+  "Apply font face for META-DATA of pretty popup."
+  (propertize meta-data 'face 'blamer-pretty-meta-data-face))
+
+(defun blamer--prettify-commit-message (commit-message)
+  "Apply font face for COMMIT-MESSAGE of pretty popup."
+  (propertize (string-trim commit-message) 'face 'blamer-pretty-commit-message-face))
+
 (defun blamer--format-pretty-tooltip (msgs)
   "Draw a pretty tooltip from MSGS alist with respecting max possible length.
 Return cons of result and count of lines."
   (let* ((enable-borders-p blamer-border-lines)
-         (render-length (- blamer-max-commit-message-length 2))
-         (top-left-corner (when enable-borders-p (list (nth 0 blamer-border-lines))))
-         (border-horizontal-line (when enable-borders-p (make-string render-length (nth 1 blamer-border-lines))))
-         (top-right-corner (when enable-borders-p (list (nth 2 blamer-border-lines))))
-         (border-vertical-line (when enable-borders-p (list (nth 3 blamer-border-lines))))
-         (bottom-right-corner (when enable-borders-p (list (nth 4 blamer-border-lines))))
-         (bottom-left-corner (when enable-borders-p (list (nth 5 blamer-border-lines))))
-         (res (concat "\n" top-left-corner border-horizontal-line top-right-corner "\n"))
+         (border-offset (if enable-borders-p 2 0))
+         (left-right-padding 2)
+         (render-length (- blamer-max-commit-message-length (+ border-offset left-right-padding)))
+         (popup-center (/ render-length 2))
+         ;; TODO: smart calculation of neighbor window borders
+         ;; (left-offset (if (< (current-column) popup-center)
+         ;;                  (current-column)
+         ;;                (- (current-column) popup-center)))
+         (left-offset (save-excursion
+                        (back-to-indentation)
+                        (current-column)))
+         (left-offset-line (make-string left-offset ? ))
+         (top-left-corner (when enable-borders-p (blamer--prettify-border (char-to-string (nth 0 blamer-border-lines)))))
+         (border-horizontal-line (when enable-borders-p (blamer--prettify-border (make-string render-length (nth 1 blamer-border-lines)))))
+         (top-right-corner (when enable-borders-p (blamer--prettify-border (char-to-string (nth 2 blamer-border-lines)))))
+         (border-vertical-line (when enable-borders-p (blamer--prettify-border (char-to-string (nth 3 blamer-border-lines)))))
+         (bottom-right-corner (when enable-borders-p (blamer--prettify-border (char-to-string (nth 4 blamer-border-lines)))))
+         (bottom-left-corner (when enable-borders-p (blamer--prettify-border (char-to-string (nth 5 blamer-border-lines)))))
+         (res (concat "\n" left-offset-line top-left-corner border-horizontal-line top-right-corner "\n"))
          splited-msgs)
 
     (dolist (m msgs)
       (setq splited-msgs (append splited-msgs (seq-partition m render-length))))
 
-    (message "spl: %s" splited-msgs)
 
     (dolist (m splited-msgs)
       (setq res (concat res
-                        border-vertical-line
+                        left-offset-line
+                        border-vertical-line " "
                         m
-                        (when (< (length m) render-length) (make-string (- render-length (length m)) ? ))
-                        border-vertical-line "\n")))
+                        (when (< (length m) render-length) (make-string (- render-length (length m) left-right-padding) ? ))
+                        " " border-vertical-line "\n")))
 
-    (setq res (concat res bottom-left-corner border-horizontal-line bottom-right-corner))
+    (setq res (concat res left-offset-line bottom-left-corner border-horizontal-line bottom-right-corner))
 
     res))
 
 (defun blamer--render-line-overlay (commit-info)
   "Render COMMIT-INFO overlay."
-  (message "is single ? %s" (eq blamer-type 'single-pretty))
   (if (eq blamer-type 'single-pretty)
 
-      (save-excursion
-        (message "Okay, should be implemented here")
-        ;; (forward-line)
-        (beginning-of-line)
-        (let* ((beg (point))
-               (ov (progn (move-end-of-line nil)
-                          (make-overlay (point) (point) nil t t)))
+      (let* ((beg (save-excursion (beginning-of-line) (point)))
+             (ov (save-excursion (move-end-of-line nil)
+                                 (make-overlay (point) (point) nil t t)))
+             (commit-hash (blamer--prettify-meta-data (plist-get commit-info :commit-hash)))
+             (msg-list `(,(when commit-hash (concat (blamer--prettify-keyword "hash:   ")
+                                                    (blamer--prettify-meta-data commit-hash)))
+                         ,(concat (blamer--prettify-keyword "author: ")
+                                  (blamer--prettify-meta-data (plist-get commit-info :commit-author)))
+                         ,(concat (blamer--prettify-keyword "date:   ")
+                                  (blamer--prettify-meta-data
+                                   (concat (plist-get commit-info :commit-date) " " (plist-get commit-info :commit-time))))
+                         " "
+                         ,(blamer--prettify-commit-message (or (plist-get commit-info :commit-message) ""))))
+             ;; (box-height (+ (length msg-list) 2))
+             (commit-descriptions (mapcar #'blamer--prettify-commit-message (plist-get commit-info :commit-description)))
 
-               (msg (blamer--format-pretty-tooltip `(,(plist-get commit-info :commit-author)
-                                                     ,(plist-get commit-info :commit-message)))))
+             (msg (blamer--format-pretty-tooltip (append msg-list commit-descriptions))))
 
-          (overlay-put ov 'after-string msg)
-          (overlay-put ov 'intangible t)
-          (overlay-put ov 'window (get-buffer-window))
-          (add-to-list 'blamer--overlays ov)))
+
+        (overlay-put ov 'after-string msg)
+        (overlay-put ov 'intangible t)
+        (overlay-put ov 'window (get-buffer-window))
+        (add-to-list 'blamer--overlays ov))
 
 
     ;; NOTE: its a simple overlay at the right side of current line
@@ -567,21 +627,24 @@ Return cons of result and count of lines."
   (setq blamer--previous-line-length (length (thing-at-point 'line)))
   (setq blamer--previous-region-active-p (region-active-p)))
 
-(defun blamer--try-render ()
-  "Render current line if is .git exist."
+(defun blamer--try-render (&optional local-type)
+  "Render current line if is .git exist.
+LOCAL-TYPE is force replacement of current `blamer-type' for handle rendering."
+
   (let* ((long-line-p (and (region-active-p)
                            (> (count-lines (region-beginning) (region-end)) blamer-max-lines)))
          (region-deselected-p (and blamer--previous-region-active-p (not (region-active-p))))
-         (clear-overlays-p (or long-line-p region-deselected-p)))
+         (clear-overlays-p (or long-line-p region-deselected-p))
+         (type (or local-type blamer-type)))
 
     (when clear-overlays-p
       (blamer--clear-overlay))
 
     (when (and (not long-line-p)
-               (or (eq blamer-type 'both)
-                   (and (eq blamer-type 'visual) (not (use-region-p)))
-                   (and (eq blamer-type 'single-pretty) (not (use-region-p)))
-                   (and (eq blamer-type 'selected) (use-region-p)))
+               (or (eq type 'both)
+                   (and (eq type 'visual) (not (use-region-p)))
+                   (and (eq type 'single-pretty) (not (use-region-p)))
+                   (and (eq type 'selected) (use-region-p)))
                (or (not blamer--previous-line-number)
                    (not (eq blamer--previous-window-width (window-width)))
                    (not (eq blamer--previous-line-number (line-number-at-pos)))
