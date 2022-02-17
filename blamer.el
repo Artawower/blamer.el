@@ -178,19 +178,19 @@ If not will use background from `blamer-face'"
   :group 'blamer)
 
 (defface blamer-pretty-commit-message-face
-    '((t :inherit font-lock-string-face))
-    "Face for pretty commit messages."
-    :group 'blamer)
+  '((t :inherit font-lock-string-face))
+  "Face for pretty commit messages."
+  :group 'blamer)
 
 (defface blamer-pretty-meta-keywords-face
-    '((t :inherit font-lock-constant-face))
-    "Face for pretty keywords."
-    :group 'blamer)
+  '((t :inherit font-lock-constant-face))
+  "Face for pretty keywords."
+  :group 'blamer)
 
 (defface blamer-pretty-meta-data-face
-    '((t :foreground "#5B6268"))
-    "Face for pretty meta information."
-    :group 'blamer)
+  '((t :foreground "#5B6268"))
+  "Face for pretty meta information."
+  :group 'blamer)
 
 (defcustom blamer-bindings nil
   "List of bindings.
@@ -532,13 +532,16 @@ Return cons of result and count of lines."
 
     res))
 
-(defun blamer--render-line-overlay (commit-info)
-  "Render COMMIT-INFO overlay."
-  (if (eq blamer-type 'single-pretty)
+(defun blamer--render-line-overlay (commit-info &optional type)
+  "Render COMMIT-INFO overlay by optional TYPE.
+when not provided `blamer-type' will be used."
+
+  (message "current type: %s" (or type blamer-type))
+  (if (eq (or type blamer-type) 'single-pretty)
 
       (let* ((beg (save-excursion (beginning-of-line) (point)))
              (ov (save-excursion (move-end-of-line nil)
-                                 (make-overlay (point) (point) nil t t)))
+                                 (make-overlay beg (point) nil t t)))
              (commit-hash (blamer--prettify-meta-data (plist-get commit-info :commit-hash)))
              (msg-list `(,(when commit-hash (concat (blamer--prettify-keyword "hash:   ")
                                                     (blamer--prettify-meta-data commit-hash)))
@@ -549,11 +552,11 @@ Return cons of result and count of lines."
                                    (concat (plist-get commit-info :commit-date) " " (plist-get commit-info :commit-time))))
                          " "
                          ,(blamer--prettify-commit-message (or (plist-get commit-info :commit-message) ""))))
-             ;; (box-height (+ (length msg-list) 2))
              (commit-descriptions (mapcar #'blamer--prettify-commit-message (plist-get commit-info :commit-description)))
 
              (msg (blamer--format-pretty-tooltip (append msg-list commit-descriptions))))
 
+        (message "Will render popup! %s" ov)
 
         (overlay-put ov 'after-string msg)
         (overlay-put ov 'intangible t)
@@ -571,8 +574,10 @@ Return cons of result and count of lines."
       (overlay-put ov 'window (get-buffer-window))
       (add-to-list 'blamer--overlays ov))))
 
-(defun blamer--render ()
-  "Render text about current line commit status."
+(defun blamer--render (&optional type)
+  "Render text about current line commit status.
+TYPE - is optional argument that can replace global `blamer-type' variable."
+
   (with-current-buffer (window-buffer (get-buffer-window))
     (save-restriction
       (widen)
@@ -601,16 +606,18 @@ Return cons of result and count of lines."
           (dolist (cmd-msg blame-cmd-res)
             (unless (blamer--git-cmd-error-p cmd-msg)
               (let ((commit-info (blamer--parse-line-info cmd-msg)))
-                (blamer--render-line-overlay commit-info)
+                (blamer--render-line-overlay commit-info type)
                 (forward-line)))))))))
 
-(defun blamer--safety-render ()
-  "Function for checking current active blamer type before rendering with delay."
-  (unless (and
-           (or (eq blamer-type 'single-pretty)
-               (eq blamer-type 'visual))
-           (use-region-p))
-    (blamer--render)))
+(defun blamer--safety-render (&optional type)
+  "Function for checking current active blamer type before rendering with delay.
+Optional TYPE argument will override global blamer-type."
+  (let ((blamer-type (or type blamer-type)))
+    (unless (and
+             (or (eq blamer-type 'single-pretty)
+                 (eq blamer-type 'visual))
+             (use-region-p))
+      (blamer--render blamer-type))))
 
 (defun blamer--render-commit-info-with-delay ()
   "Render commit info with delay."
@@ -704,6 +711,29 @@ will appear after BLAMER-IDLE-TIME. It works only inside git repo"
     (unless blamer-mode
       (blamer-mode)))
   :group 'blamer)
+
+(defun blamer--reset-state-once ()
+  "Reset all blamer side-effect like overlay/timers only once."
+  (message "State reseted")
+  (when (or (not blamer--previous-line-number)
+            (not (eq blamer--previous-window-width (window-width)))
+            (not (eq blamer--previous-line-number (line-number-at-pos)))
+            (not (eq blamer--previous-line-length (length (thing-at-point 'line)))))
+    (blamer--reset-state)
+    (remove-hook 'post-command-hook #'blamer--reset-state-once t)
+    (remove-hook 'window-state-change-hook #'blamer--reset-state-once t)))
+
+;;;###autoload
+(defun blamer-show-commit-info (&optional type)
+  "Show commit info from git blame.
+
+TYPE - optional parameter, by default will use `single-pretty'."
+
+  (interactive)
+  (blamer--clear-overlay)
+  (blamer--render (or type 'single-pretty))
+  (blamer--preserve-state)
+  (add-hook 'post-command-hook #'blamer--reset-state-once nil t))
 
 (provide 'blamer)
 ;;; blamer.el ends here
