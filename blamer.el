@@ -124,7 +124,8 @@ Will add additional space for each BLAMER-OFFSET-PER-SYMBOL"
 (defcustom blamer--overlay-popup-position 'bottom
   "Position of rendered popup.
 Could be `bottom', `top' and `smart' position.
-When smart position is enabled blamer will try to calculate better place to paste popup."
+When smart position is enabled blamer will try to calculate better
+place to paste popup."
   :group 'blamer
   :type '(choice (const :tag "Top" top)
                  (const :tag "Bottom" bottom)
@@ -152,7 +153,8 @@ Alternative preset: '(?┌ ?─ ?┐ ?│ ?┘ ?└)"
 (defcustom blamer-max-commit-message-length 30
   "Max length of commit message.
 Commit message with more characters will be truncated with ellipsis at the end.
-Also, when `blamer-type' is overlay-popup this value is used for max tooltip length."
+Also, when `blamer-type' is overlay-popup this value is used for max tooltip
+length."
   :group 'blamer
   :type 'integer)
 
@@ -256,15 +258,18 @@ author name by left click and copying commit hash by right click.
   "Git.name for current repository.")
 
 (defun blamer-tooltip-commit-message (commit-info)
-  "This function can be use as `blamer-tooltip-function', to show the commit message from COMMIT-INFO."
+  "This function can be use as `blamer-tooltip-function'.
+Will show the commit message from COMMIT-INFO."
   (plist-get commit-info :raw-commit-message))
 
 (defun blamer-tooltip-author-info (commit-info)
-  "This function can be use as `blamer-tooltip-function', to show the author from COMMIT-INFO."
+  "This function can be use as `blamer-tooltip-function'.
+Will show the author from COMMIT-INFO."
   (format "%s (%s)" (plist-get commit-info :commit-author) (plist-get commit-info :raw-commit-author)))
 
 (defun blamer-tooltip-keybindings (_commit-info)
-  "This function can be use as `blamer-tooltip-function', to show the available `blamer-bindings'."
+  "This function can be use as `blamer-tooltip-function'.
+Will show the available `blamer-bindings'."
   (if (> (length blamer-bindings) 0)
       (mapconcat (lambda (bind) (format "%s - %s" (car bind) (cdr bind))) blamer-bindings "\n")
     nil))

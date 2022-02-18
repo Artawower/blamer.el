@@ -2,3 +2,7 @@
 .DS_Store
 .AppleDouble
 .LSOverride
+
+# Added automatically by ‘eldev init’.
+/.eldev
+/Eldev-local
