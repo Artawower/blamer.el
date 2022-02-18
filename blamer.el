@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (a "1.0.0"))
-;; Version: 0.3.8
+;; Version: 0.4.0
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -626,7 +626,7 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
 
 (defun blamer--safety-render (&optional type)
   "Function for checking current active blamer type before rendering with delay.
-Optional TYPE argument will override global blamer-type."
+Optional TYPE argument will override global `blamer-type'."
   (let ((blamer-type (or type blamer-type)))
     (unless (and
              (or (eq blamer-type 'overlay-popup)
