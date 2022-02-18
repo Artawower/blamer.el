@@ -172,7 +172,7 @@ If not will use background from `blamer-face'"
   :group 'blamer)
 
 (defface blamer-pretty-border-face
-  '((t :foreground "#7a88cf"
+  '((t :inherit font-lock-keyword-face
        :background nil))
   "Face for pretty blamer borders."
   :group 'blamer)
@@ -183,12 +183,12 @@ If not will use background from `blamer-face'"
   :group 'blamer)
 
 (defface blamer-pretty-meta-keywords-face
-  '((t :inherit font-lock-constant-face))
+  '((t :inherit font-lock-doc-face))
   "Face for pretty keywords."
   :group 'blamer)
 
 (defface blamer-pretty-meta-data-face
-  '((t :foreground "#5B6268"))
+  '((t :inherit font-lock-variable-name-face))
   "Face for pretty meta information."
   :group 'blamer)
 
@@ -232,7 +232,10 @@ author name by left click and copying commit hash by right click.
   "Previous window width.")
 
 (defvar blamer--previous-line-length nil
-  "Current line number length for detect rerender function.")
+  "Current line number length for detect render function.")
+
+(defvar blamer--previous-point nil
+  "Last preserved blamer point.")
 
 (defvar blamer--previous-region-active-p nil
   "Was previous state is active region?")
@@ -632,6 +635,7 @@ Optional TYPE argument will override global blamer-type."
   (setq blamer--previous-line-number (line-number-at-pos))
   (setq blamer--previous-window-width (window-width))
   (setq blamer--previous-line-length (length (thing-at-point 'line)))
+  (setq blamer--previous-point (point))
   (setq blamer--previous-region-active-p (region-active-p)))
 
 (defun blamer--try-render (&optional local-type)
@@ -715,9 +719,9 @@ will appear after BLAMER-IDLE-TIME. It works only inside git repo"
 (defun blamer--reset-state-once ()
   "Reset all blamer side-effect like overlay/timers only once."
   (message "State reseted")
-  (when (or (not blamer--previous-line-number)
+  (when (or (not blamer--previous-point)
+            (not (eq blamer--previous-point (point)))
             (not (eq blamer--previous-window-width (window-width)))
-            (not (eq blamer--previous-line-number (line-number-at-pos)))
             (not (eq blamer--previous-line-length (length (thing-at-point 'line)))))
     (blamer--reset-state)
     (remove-hook 'post-command-hook #'blamer--reset-state-once t)
