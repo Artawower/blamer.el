@@ -113,13 +113,22 @@ Will add additional space for each BLAMER-OFFSET-PER-SYMBOL"
   "Type of blamer.
 'visual - show blame only for current line
 'selected - show blame only for selected line
-'single-pretty - show commit info inside pretty overlay
+'overlay-popup - show commit info inside pretty overlay
 'both - both of them"
   :group 'blamer
   :type '(choice (const :tag "Visual only" visual)
-                 (connst :tag "Single pretty" single-pretty)
+                 (const :tag "Pretty overlay popup" overlay-popup)
                  (const :tag "Visual and selected" both)
                  (const :tag "Selected only" selected)))
+
+(defcustom blamer--overlay-popup-position 'bottom
+  "Position of rendered popup.
+Could be `bottom', `top' and `smart' position.
+When smart position is enabled blamer will try to calculate better place to paste popup."
+  :group 'blamer
+  :type '(choice (const :tag "Top" top)
+                 (const :tag "Bottom" bottom)
+                 (const :smart "Smart detection" smart)))
 
 (defcustom blamer-self-author-name (if (string-empty-p user-full-name) "You"
                                      user-full-name)
@@ -143,7 +152,7 @@ Alternative preset: '(?┌ ?─ ?┐ ?│ ?┘ ?└)"
 (defcustom blamer-max-commit-message-length 30
   "Max length of commit message.
 Commit message with more characters will be truncated with ellipsis at the end.
-Also, when `blamer-type' is single-pretty this value is used for max tooltip length."
+Also, when `blamer-type' is overlay-popup this value is used for max tooltip length."
   :group 'blamer
   :type 'integer)
 
@@ -183,7 +192,7 @@ If not will use background from `blamer-face'"
   :group 'blamer)
 
 (defface blamer-pretty-meta-keywords-face
-  '((t :inherit font-lock-doc-face))
+  '((t :inherit font-lock-variable-name-face))
   "Face for pretty keywords."
   :group 'blamer)
 
@@ -502,13 +511,13 @@ Return cons of result and count of lines."
          (left-right-padding 2)
          (render-length (- blamer-max-commit-message-length (+ border-offset left-right-padding)))
          (popup-center (/ render-length 2))
-         ;; TODO: smart calculation of neighbor window borders
-         ;; (left-offset (if (< (current-column) popup-center)
-         ;;                  (current-column)
-         ;;                (- (current-column) popup-center)))
-         (left-offset (save-excursion
-                        (back-to-indentation)
-                        (current-column)))
+         (left-offset (if (eq blamer--overlay-popup-position 'smart)
+                          (if (< (current-column) popup-center)
+                              (current-column)
+                            (- (current-column) popup-center))
+                        (save-excursion
+                          (back-to-indentation)
+                          (current-column))))
          (left-offset-line (make-string left-offset ? ))
          (top-left-corner (when enable-borders-p (blamer--prettify-border (char-to-string (nth 0 blamer-border-lines)))))
          (border-horizontal-line (when enable-borders-p (blamer--prettify-border (make-string render-length (nth 1 blamer-border-lines)))))
@@ -516,11 +525,11 @@ Return cons of result and count of lines."
          (border-vertical-line (when enable-borders-p (blamer--prettify-border (char-to-string (nth 3 blamer-border-lines)))))
          (bottom-right-corner (when enable-borders-p (blamer--prettify-border (char-to-string (nth 4 blamer-border-lines)))))
          (bottom-left-corner (when enable-borders-p (blamer--prettify-border (char-to-string (nth 5 blamer-border-lines)))))
-         (res (concat "\n" left-offset-line top-left-corner border-horizontal-line top-right-corner "\n"))
+         (res (concat left-offset-line top-left-corner border-horizontal-line top-right-corner "\n"))
          splited-msgs)
 
     (dolist (m msgs)
-      (setq splited-msgs (append splited-msgs (seq-partition m render-length))))
+      (setq splited-msgs (append splited-msgs (seq-partition m (- render-length 2)))))
 
 
     (dolist (m splited-msgs)
@@ -532,6 +541,9 @@ Return cons of result and count of lines."
                         " " border-vertical-line "\n")))
 
     (setq res (concat res left-offset-line bottom-left-corner border-horizontal-line bottom-right-corner))
+    (if (eq blamer--overlay-popup-position 'top)
+        (setq res (concat res "\n"))
+      (setq res (concat "\n" res)))
 
     res))
 
@@ -539,13 +551,9 @@ Return cons of result and count of lines."
   "Render COMMIT-INFO overlay by optional TYPE.
 when not provided `blamer-type' will be used."
 
-  (message "current type: %s" (or type blamer-type))
-  (if (eq (or type blamer-type) 'single-pretty)
+  (if (eq (or type blamer-type) 'overlay-popup)
 
-      (let* ((beg (save-excursion (beginning-of-line) (point)))
-             (ov (save-excursion (move-end-of-line nil)
-                                 (make-overlay beg (point) nil t t)))
-             (commit-hash (blamer--prettify-meta-data (plist-get commit-info :commit-hash)))
+      (let* ((commit-hash (blamer--prettify-meta-data (plist-get commit-info :commit-hash)))
              (msg-list `(,(when commit-hash (concat (blamer--prettify-keyword "hash:   ")
                                                     (blamer--prettify-meta-data commit-hash)))
                          ,(concat (blamer--prettify-keyword "author: ")
@@ -556,18 +564,22 @@ when not provided `blamer-type' will be used."
                          " "
                          ,(blamer--prettify-commit-message (or (plist-get commit-info :commit-message) ""))))
              (commit-descriptions (mapcar #'blamer--prettify-commit-message (plist-get commit-info :commit-description)))
+             (msg-lines (append msg-list commit-descriptions))
+             (msg (blamer--format-pretty-tooltip msg-lines))
 
-             (msg (blamer--format-pretty-tooltip (append msg-list commit-descriptions))))
+             (beg (save-excursion (beginning-of-line) (point)))
+             (ov (save-excursion (move-end-of-line nil)
+                                 (make-overlay beg (point) nil t t))))
 
-        (message "Will render popup! %s" ov)
+        (if (eq blamer--overlay-popup-position 'top)
+            (overlay-put ov 'before-string msg)
+          (overlay-put ov 'after-string msg))
 
-        (overlay-put ov 'after-string msg)
         (overlay-put ov 'intangible t)
         (overlay-put ov 'window (get-buffer-window))
         (add-to-list 'blamer--overlays ov))
 
 
-    ;; NOTE: its a simple overlay at the right side of current line
     (when-let ((ov (progn (move-end-of-line nil)
                           (make-overlay (point) (point) nil t t)))
                (popup-msg (blamer--create-popup-msg commit-info)))
@@ -617,7 +629,7 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
 Optional TYPE argument will override global blamer-type."
   (let ((blamer-type (or type blamer-type)))
     (unless (and
-             (or (eq blamer-type 'single-pretty)
+             (or (eq blamer-type 'overlay-popup)
                  (eq blamer-type 'visual))
              (use-region-p))
       (blamer--render blamer-type))))
@@ -654,7 +666,7 @@ LOCAL-TYPE is force replacement of current `blamer-type' for handle rendering."
     (when (and (not long-line-p)
                (or (eq type 'both)
                    (and (eq type 'visual) (not (use-region-p)))
-                   (and (eq type 'single-pretty) (not (use-region-p)))
+                   (and (eq type 'overlay-popup) (not (use-region-p)))
                    (and (eq type 'selected) (use-region-p)))
                (or (not blamer--previous-line-number)
                    (not (eq blamer--previous-window-width (window-width)))
@@ -674,6 +686,7 @@ LOCAL-TYPE is force replacement of current `blamer-type' for handle rendering."
   (setq blamer-idle-timer nil)
   (setq blamer--previous-line-number nil)
   (setq blamer--previous-window-width nil)
+  (setq blamer--previous-point nil)
   (remove-hook 'post-command-hook #'blamer--try-render t)
   (remove-hook 'window-state-change-hook #'blamer--try-render t))
 
@@ -718,24 +731,25 @@ will appear after BLAMER-IDLE-TIME. It works only inside git repo"
 
 (defun blamer--reset-state-once ()
   "Reset all blamer side-effect like overlay/timers only once."
-  (message "State reseted")
   (when (or (not blamer--previous-point)
             (not (eq blamer--previous-point (point)))
             (not (eq blamer--previous-window-width (window-width)))
             (not (eq blamer--previous-line-length (length (thing-at-point 'line)))))
     (blamer--reset-state)
     (remove-hook 'post-command-hook #'blamer--reset-state-once t)
-    (remove-hook 'window-state-change-hook #'blamer--reset-state-once t)))
+    (remove-hook 'window-state-change-hook #'blamer--reset-state-once t)
+    (when blamer-mode
+          (add-hook 'post-command-hook #'blamer--try-render nil t)
+          (add-hook 'window-state-change-hook #'blamer--try-render nil t))))
 
 ;;;###autoload
 (defun blamer-show-commit-info (&optional type)
   "Show commit info from git blame.
 
-TYPE - optional parameter, by default will use `single-pretty'."
-
+TYPE - optional parameter, by default will use `overlay-popup'."
   (interactive)
-  (blamer--clear-overlay)
-  (blamer--render (or type 'single-pretty))
+  (blamer--reset-state)
+  (blamer--render (or type 'overlay-popup))
   (blamer--preserve-state)
   (add-hook 'post-command-hook #'blamer--reset-state-once nil t))
 
