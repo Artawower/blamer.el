@@ -633,10 +633,9 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
   "Function for checking current active blamer type before rendering with delay.
 Optional TYPE argument will override global `blamer-type'."
   (let ((blamer-type (or type blamer-type)))
-    (unless (and
-             (or (eq blamer-type 'overlay-popup)
-                 (eq blamer-type 'visual))
-             (use-region-p))
+    (unless (and (or (eq blamer-type 'overlay-popup)
+                     (eq blamer-type 'visual))
+                 (use-region-p))
       (blamer--render blamer-type))))
 
 (defun blamer--render-commit-info-with-delay ()
@@ -744,8 +743,8 @@ will appear after BLAMER-IDLE-TIME. It works only inside git repo"
     (remove-hook 'post-command-hook #'blamer--reset-state-once t)
     (remove-hook 'window-state-change-hook #'blamer--reset-state-once t)
     (when blamer-mode
-          (add-hook 'post-command-hook #'blamer--try-render nil t)
-          (add-hook 'window-state-change-hook #'blamer--try-render nil t))))
+      (add-hook 'post-command-hook #'blamer--try-render nil t)
+      (add-hook 'window-state-change-hook #'blamer--try-render nil t))))
 
 ;;;###autoload
 (defun blamer-show-commit-info (&optional type)
