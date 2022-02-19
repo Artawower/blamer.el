@@ -129,7 +129,7 @@ place to paste popup."
   :group 'blamer
   :type '(choice (const :tag "Top" top)
                  (const :tag "Bottom" bottom)
-                 (const :smart "Smart detection" smart)))
+                 (const :tag "Smart detection" smart)))
 
 (defcustom blamer-self-author-name (if (string-empty-p user-full-name) "You"
                                      user-full-name)
