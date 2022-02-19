@@ -183,7 +183,7 @@ If not will use background from `blamer-face'"
   :group 'blamer)
 
 (defface blamer-pretty-border-face
-  '((t :inherit font-lock-keyword-face
+  '((t :inherit font-lock-variable-name-face
        :background nil))
   "Face for pretty blamer borders."
   :group 'blamer)
@@ -194,7 +194,7 @@ If not will use background from `blamer-face'"
   :group 'blamer)
 
 (defface blamer-pretty-meta-keywords-face
-  '((t :inherit font-lock-variable-name-face))
+  '((t :inherit font-lock-function-name-face))
   "Face for pretty keywords."
   :group 'blamer)
 
@@ -276,7 +276,8 @@ Will show the available `blamer-bindings'."
 
 (defun blamer--git-exist-p ()
   "Return t if .git exist."
-  (let* ((git-exist-stdout (shell-command-to-string blamer--git-repo-cmd)))
+  (when-let* ((file-name (blamer--get-local-name (buffer-file-name)))
+              (git-exist-stdout (shell-command-to-string blamer--git-repo-cmd)))
     (string-match "^true" git-exist-stdout)))
 
 (defun blamer--clear-overlay ()
@@ -612,10 +613,10 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
                                       (line-number-at-pos))
                                   (line-number-at-pos)))
              (file-name (blamer--get-local-name (buffer-file-name)))
-             (file-name (replace-regexp-in-string " " "\\\\\  " file-name))
+             (file-name (when file-name (replace-regexp-in-string " " "\\\\\  " file-name)))
              (cmd (format blamer--git-blame-cmd start-line-number end-line-number file-name))
-             (blame-cmd-res (shell-command-to-string cmd))
-             (blame-cmd-res (butlast (split-string blame-cmd-res "\n"))))
+             (blame-cmd-res (when file-name (shell-command-to-string cmd)))
+             (blame-cmd-res (when blame-cmd-res (butlast (split-string blame-cmd-res "\n")))))
 
         (blamer--clear-overlay)
 
