@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (a "1.0.0"))
-;; Version: 0.3.9
+;; Version: 0.4.0
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@
 ;;; Code:
 
 (require 'files)
+(require 'seq)
 (require 'subr-x)
 (require 'simple)
 (require 'time-date)
@@ -112,11 +113,23 @@ Will add additional space for each BLAMER-OFFSET-PER-SYMBOL"
   "Type of blamer.
 'visual - show blame only for current line
 'selected - show blame only for selected line
+'overlay-popup - show commit info inside pretty overlay
 'both - both of them"
   :group 'blamer
   :type '(choice (const :tag "Visual only" visual)
+                 (const :tag "Pretty overlay popup" overlay-popup)
                  (const :tag "Visual and selected" both)
                  (const :tag "Selected only" selected)))
+
+(defcustom blamer--overlay-popup-position 'bottom
+  "Position of rendered popup.
+Could be `bottom', `top' and `smart' position.
+When smart position is enabled blamer will try to calculate better
+place to paste popup."
+  :group 'blamer
+  :type '(choice (const :tag "Top" top)
+                 (const :tag "Bottom" bottom)
+                 (const :tag "Smart detection" smart)))
 
 (defcustom blamer-self-author-name (if (string-empty-p user-full-name) "You"
                                      user-full-name)
@@ -129,9 +142,19 @@ Will add additional space for each BLAMER-OFFSET-PER-SYMBOL"
   :group 'blamer
   :type 'integer)
 
+(defcustom blamer-border-lines '(?╭ ?─ ?╮ ?│ ?╯ ?╰ )
+  "List of lines and borders. When value is nil, borders will not preset.
+Be careful! This config highly coupled with your current face!
+
+Alternative preset: '(?┌ ?─ ?┐ ?│ ?┘ ?└)"
+  :group 'blamer
+  :type 'alist)
+
 (defcustom blamer-max-commit-message-length 30
   "Max length of commit message.
-Commit message with more characters will be truncated with ellipsis at the end"
+Commit message with more characters will be truncated with ellipsis at the end.
+Also, when `blamer-type' is overlay-popup this value is used for max tooltip
+length."
   :group 'blamer
   :type 'integer)
 
@@ -157,6 +180,40 @@ If not will use background from `blamer-face'"
        :background nil
        :italic t))
   "Face for blamer info."
+  :group 'blamer)
+
+(defface blamer-pretty-border-face
+  `((t :inherit font-lock-variable-name-face
+       :italic nil
+       :background nil
+       :height ,(face-attribute 'default :height)
+       :font ,(face-attribute 'default :font)))
+  "Face for pretty blamer borders."
+  :group 'blamer)
+
+(defface blamer-pretty-commit-message-face
+  `((t :inherit font-lock-string-face
+       :italic nil
+       :height ,(face-attribute 'default :height)
+       :font ,(face-attribute 'default :font)))
+  "Face for pretty commit messages."
+  :group 'blamer)
+
+(defface blamer-pretty-meta-keywords-face
+  `((t :inherit font-lock-function-name-face
+       :italic nil
+       :height ,(face-attribute 'default :height)
+       :font ,(face-attribute 'default :font)))
+  "Face for pretty keywords."
+  :group 'blamer)
+
+(defface blamer-pretty-meta-data-face
+  `((t :inherit font-lock-variable-name-face
+       :italic nil
+       :height ,(face-attribute 'default :height)
+       :font ,(face-attribute 'default :font)))
+
+  "Face for pretty meta information."
   :group 'blamer)
 
 (defcustom blamer-bindings nil
@@ -199,7 +256,10 @@ author name by left click and copying commit hash by right click.
   "Previous window width.")
 
 (defvar blamer--previous-line-length nil
-  "Current line number length for detect rerender function.")
+  "Current line number length for detect render function.")
+
+(defvar blamer--previous-point nil
+  "Last preserved blamer point.")
 
 (defvar blamer--previous-region-active-p nil
   "Was previous state is active region?")
@@ -211,15 +271,18 @@ author name by left click and copying commit hash by right click.
   "Git.name for current repository.")
 
 (defun blamer-tooltip-commit-message (commit-info)
-  "This function can be use as `blamer-tooltip-function', to show the commit message from COMMIT-INFO."
+  "This function can be use as `blamer-tooltip-function'.
+Will show the commit message from COMMIT-INFO."
   (plist-get commit-info :raw-commit-message))
 
 (defun blamer-tooltip-author-info (commit-info)
-  "This function can be use as `blamer-tooltip-function', to show the author from COMMIT-INFO."
+  "This function can be use as `blamer-tooltip-function'.
+Will show the author from COMMIT-INFO."
   (format "%s (%s)" (plist-get commit-info :commit-author) (plist-get commit-info :raw-commit-author)))
 
 (defun blamer-tooltip-keybindings (_commit-info)
-  "This function can be use as `blamer-tooltip-function', to show the available `blamer-bindings'."
+  "This function can be use as `blamer-tooltip-function'.
+Will show the available `blamer-bindings'."
   (if (> (length blamer-bindings) 0)
       (mapconcat (lambda (bind) (format "%s - %s" (car bind) (cdr bind))) blamer-bindings "\n")
     nil))
@@ -348,7 +411,7 @@ COMMIT-INFO - all the commit information, for `blamer--apply-bindings'"
 
     (concat alignment-text formatted-message)))
 
-(defun blamer--get-commit-message (hash)
+(defun blamer--get-commit-messages (hash)
   "Get commit message by provided HASH.
 Return nil if error."
   (let* ((git-commit-res (shell-command-to-string (format blamer--git-commit-message hash)))
@@ -357,9 +420,7 @@ Return nil if error."
     (unless has-error
       (string-match blamer--commit-message-regexp git-commit-res)
       (setq commit-message (match-string 1 git-commit-res))
-      (setq commit-message (replace-regexp-in-string "\n" " " commit-message))
-      (setq commit-message (string-trim commit-message))
-      (list (truncate-string-to-width commit-message blamer-max-commit-message-length nil nil "...") commit-message))))
+      (split-string commit-message "\n"))))
 
 (defun blamer--parse-line-info (blame-msg)
   "Parse BLAME-MSG and create a plist."
@@ -371,8 +432,14 @@ Return nil if error."
                           raw-commit-author))
          (commit-date (match-string 3 blame-msg))
          (commit-time (match-string 4 blame-msg))
-         (commit-messages (blamer--get-commit-message commit-hash))
-         (commit-message (when blamer-commit-formatter (nth 0 commit-messages)))
+         (commit-messages (blamer--get-commit-messages commit-hash))
+         (commit-message (car commit-messages))
+         (commit-message (when commit-message (string-trim commit-message)))
+         (commit-message (when (and blamer-commit-formatter commit-message)
+                           (truncate-string-to-width
+                            commit-message
+                            blamer-max-commit-message-length nil nil "...")))
+         (commit-description (cdr commit-messages))
          (raw-commit-message (nth 1 commit-messages))
          (parsed-commit-info `(:commit-hash ,commit-hash
                                :commit-author ,commit-author
@@ -380,6 +447,7 @@ Return nil if error."
                                :commit-time ,commit-time
                                :raw-commit-author ,raw-commit-author
                                :commit-message ,commit-message
+                               :commit-description ,commit-description
                                :raw-commit-message ,raw-commit-message)))
 
     parsed-commit-info))
@@ -419,7 +487,7 @@ Return nil if error."
     filename))
 
 (defun blamer--apply-tooltip(text commit-info)
-  "Compute the toolip from `blamer-tooltip-function', TEXT and COMMIT-INFO."
+  "Compute the tooltip from `blamer-tooltip-function', TEXT and COMMIT-INFO."
   (let ((help-echo (if (and blamer-tooltip-function (functionp blamer-tooltip-function))
                        (funcall blamer-tooltip-function commit-info)
                      nil)))
@@ -438,8 +506,113 @@ Return nil if error."
     (setq text (propertize text 'keymap map)))
   text)
 
-(defun blamer--render ()
-  "Render text about current line commit status."
+(defun blamer--prettify-border (border)
+  "Apply font face for pretty-string BORDER."
+  (propertize border 'face 'blamer-pretty-border-face))
+
+(defun blamer--prettify-keyword (keyword)
+  "Apply font face for KEYWORD of pretty popup."
+  (propertize keyword 'face 'blamer-pretty-meta-keywords-face))
+
+(defun blamer--prettify-meta-data (meta-data)
+  "Apply font face for META-DATA of pretty popup."
+  (propertize meta-data 'face 'blamer-pretty-meta-data-face))
+
+(defun blamer--prettify-commit-message (commit-message)
+  "Apply font face for COMMIT-MESSAGE of pretty popup."
+  (propertize (string-trim commit-message) 'face 'blamer-pretty-commit-message-face))
+
+(defun blamer--format-pretty-tooltip (msgs)
+  "Draw a pretty tooltip from MSGS alist with respecting max possible length.
+Return cons of result and count of lines."
+  (let* ((enable-borders-p blamer-border-lines)
+         (border-offset (if enable-borders-p 2 0))
+         (left-right-padding 2)
+         (render-length (- blamer-max-commit-message-length (+ border-offset left-right-padding)))
+         (popup-center (/ render-length 2))
+         (left-offset (if (eq blamer--overlay-popup-position 'smart)
+                          (if (< (current-column) popup-center)
+                              (current-column)
+                            (- (current-column) popup-center))
+                        (save-excursion
+                          (back-to-indentation)
+                          (current-column))))
+         (left-offset-line (blamer--prettify-border (make-string left-offset ? )))
+         (top-left-corner (when enable-borders-p (blamer--prettify-border (char-to-string (nth 0 blamer-border-lines)))))
+         (border-horizontal-line (when enable-borders-p (blamer--prettify-border (make-string render-length (nth 1 blamer-border-lines)))))
+         (top-right-corner (when enable-borders-p (blamer--prettify-border (char-to-string (nth 2 blamer-border-lines)))))
+         (border-vertical-line (when enable-borders-p (blamer--prettify-border (char-to-string (nth 3 blamer-border-lines)))))
+         (bottom-right-corner (when enable-borders-p (blamer--prettify-border (char-to-string (nth 4 blamer-border-lines)))))
+         (bottom-left-corner (when enable-borders-p (blamer--prettify-border (char-to-string (nth 5 blamer-border-lines)))))
+         (padding (blamer--prettify-border " "))
+         (res (concat left-offset-line top-left-corner border-horizontal-line top-right-corner "\n"))
+         splited-msgs)
+
+    (dolist (m msgs)
+      (setq splited-msgs (append splited-msgs (seq-partition m (- render-length 2)))))
+
+
+    (dolist (m splited-msgs)
+      (setq res (concat res
+                        left-offset-line
+                        border-vertical-line padding
+                        m
+                        (when (< (length m) render-length) (blamer--prettify-border (make-string (- render-length (length m) left-right-padding) ? )))
+                        padding border-vertical-line "\n")))
+
+    (setq res (concat res left-offset-line bottom-left-corner border-horizontal-line bottom-right-corner))
+    (if (eq blamer--overlay-popup-position 'top)
+        (setq res (concat res "\n"))
+      (setq res (concat "\n" res)))
+
+    res))
+
+(defun blamer--render-line-overlay (commit-info &optional type)
+  "Render COMMIT-INFO overlay by optional TYPE.
+when not provided `blamer-type' will be used."
+
+  (if (eq (or type blamer-type) 'overlay-popup)
+
+      (let* ((commit-hash (blamer--prettify-meta-data (plist-get commit-info :commit-hash)))
+             (msg-list `(,(when commit-hash (concat (blamer--prettify-keyword "hash:   ")
+                                                    (blamer--prettify-meta-data commit-hash)))
+                         ,(concat (blamer--prettify-keyword "author: ")
+                                  (blamer--prettify-meta-data (plist-get commit-info :commit-author)))
+                         ,(concat (blamer--prettify-keyword "date:   ")
+                                  (blamer--prettify-meta-data
+                                   (concat (plist-get commit-info :commit-date) " " (plist-get commit-info :commit-time))))
+                         ,(blamer--prettify-border " ")
+                         ,(blamer--prettify-commit-message (or (plist-get commit-info :commit-message) ""))))
+             (commit-descriptions (mapcar #'blamer--prettify-commit-message (plist-get commit-info :commit-description)))
+             (msg-lines (append msg-list commit-descriptions))
+             (msg (blamer--format-pretty-tooltip msg-lines))
+
+             (beg (save-excursion (beginning-of-line) (point)))
+             (ov (save-excursion (move-end-of-line nil)
+                                 (make-overlay beg (point) nil t t))))
+
+        (if (eq blamer--overlay-popup-position 'top)
+            (overlay-put ov 'before-string msg)
+          (overlay-put ov 'after-string msg))
+
+        (overlay-put ov 'intangible t)
+        (overlay-put ov 'window (get-buffer-window))
+        (add-to-list 'blamer--overlays ov))
+
+
+    (when-let ((ov (progn (move-end-of-line nil)
+                          (make-overlay (point) (point) nil t t)))
+               (popup-msg (blamer--create-popup-msg commit-info)))
+
+      (overlay-put ov 'after-string popup-msg)
+      (overlay-put ov 'intangible t)
+      (overlay-put ov 'window (get-buffer-window))
+      (add-to-list 'blamer--overlays ov))))
+
+(defun blamer--render (&optional type)
+  "Render text about current line commit status.
+TYPE - is optional argument that can replace global `blamer-type' variable."
+
   (with-current-buffer (window-buffer (get-buffer-window))
     (save-restriction
       (widen)
@@ -467,22 +640,18 @@ Return nil if error."
 
           (dolist (cmd-msg blame-cmd-res)
             (unless (blamer--git-cmd-error-p cmd-msg)
-              (let* ((commit-info (blamer--parse-line-info cmd-msg))
-                     (popup-msg (blamer--create-popup-msg commit-info))
-                     (ov (progn
-                           (move-end-of-line nil)
-                           (make-overlay (point) (point) nil t t))))
-                (when popup-msg
-                  (overlay-put ov 'after-string popup-msg)
-                  (overlay-put ov 'intangible t)
-                  (overlay-put ov 'window (get-buffer-window))
-                  (add-to-list 'blamer--overlays ov)
-                  (forward-line))))))))))
+              (let ((commit-info (blamer--parse-line-info cmd-msg)))
+                (blamer--render-line-overlay commit-info type)
+                (forward-line)))))))))
 
-(defun blamer--safety-render ()
-  "Function for checking current active blamer type before rendering with delay."
-  (unless (and (eq blamer-type 'visual) (use-region-p))
-    (blamer--render)))
+(defun blamer--safety-render (&optional type)
+  "Function for checking current active blamer type before rendering with delay.
+Optional TYPE argument will override global `blamer-type'."
+  (let ((blamer-type (or type blamer-type)))
+    (unless (and (or (eq blamer-type 'overlay-popup)
+                     (eq blamer-type 'visual))
+                 (use-region-p))
+      (blamer--render blamer-type))))
 
 (defun blamer--render-commit-info-with-delay ()
   "Render commit info with delay."
@@ -497,22 +666,27 @@ Return nil if error."
   (setq blamer--previous-line-number (line-number-at-pos))
   (setq blamer--previous-window-width (window-width))
   (setq blamer--previous-line-length (length (thing-at-point 'line)))
+  (setq blamer--previous-point (point))
   (setq blamer--previous-region-active-p (region-active-p)))
 
-(defun blamer--try-render ()
-  "Render current line if is .git exist."
+(defun blamer--try-render (&optional local-type)
+  "Render current line if is .git exist.
+LOCAL-TYPE is force replacement of current `blamer-type' for handle rendering."
+
   (let* ((long-line-p (and (region-active-p)
                            (> (count-lines (region-beginning) (region-end)) blamer-max-lines)))
          (region-deselected-p (and blamer--previous-region-active-p (not (region-active-p))))
-         (clear-overlays-p (or long-line-p region-deselected-p)))
+         (clear-overlays-p (or long-line-p region-deselected-p))
+         (type (or local-type blamer-type)))
 
     (when clear-overlays-p
       (blamer--clear-overlay))
 
     (when (and (not long-line-p)
-               (or (eq blamer-type 'both)
-                   (and (eq blamer-type 'visual) (not (use-region-p)))
-                   (and (eq blamer-type 'selected) (use-region-p)))
+               (or (eq type 'both)
+                   (and (eq type 'visual) (not (use-region-p)))
+                   (and (eq type 'overlay-popup) (not (use-region-p)))
+                   (and (eq type 'selected) (use-region-p)))
                (or (not blamer--previous-line-number)
                    (not (eq blamer--previous-window-width (window-width)))
                    (not (eq blamer--previous-line-number (line-number-at-pos)))
@@ -531,6 +705,7 @@ Return nil if error."
   (setq blamer-idle-timer nil)
   (setq blamer--previous-line-number nil)
   (setq blamer--previous-window-width nil)
+  (setq blamer--previous-point nil)
   (remove-hook 'post-command-hook #'blamer--try-render t)
   (remove-hook 'window-state-change-hook #'blamer--try-render t))
 
@@ -572,6 +747,30 @@ will appear after BLAMER-IDLE-TIME. It works only inside git repo"
     (unless blamer-mode
       (blamer-mode)))
   :group 'blamer)
+
+(defun blamer--reset-state-once ()
+  "Reset all blamer side-effect like overlay/timers only once."
+  (when (or (not blamer--previous-point)
+            (not (eq blamer--previous-point (point)))
+            (not (eq blamer--previous-window-width (window-width)))
+            (not (eq blamer--previous-line-length (length (thing-at-point 'line)))))
+    (blamer--reset-state)
+    (remove-hook 'post-command-hook #'blamer--reset-state-once t)
+    (remove-hook 'window-state-change-hook #'blamer--reset-state-once t)
+    (when blamer-mode
+      (add-hook 'post-command-hook #'blamer--try-render nil t)
+      (add-hook 'window-state-change-hook #'blamer--try-render nil t))))
+
+;;;###autoload
+(defun blamer-show-commit-info (&optional type)
+  "Show commit info from git blame.
+
+TYPE - optional parameter, by default will use `overlay-popup'."
+  (interactive)
+  (blamer--reset-state)
+  (blamer--render (or type 'overlay-popup))
+  (blamer--preserve-state)
+  (add-hook 'post-command-hook #'blamer--reset-state-once nil t))
 
 (provide 'blamer)
 ;;; blamer.el ends here

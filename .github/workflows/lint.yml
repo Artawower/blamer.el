@@ -1,39 +1,33 @@
-name: check
+name: CI
 
 on:
-  pull_request:
   push:
-    branches:
-      - master
-      - "feature/*"
-      - "hotfix/*"
-      - develop
+    paths-ignore: ['**.md', '**.adoc']
+  pull_request:
+    paths-ignore: ['**.md', '**.adoc']
 
 jobs:
-  check:
+  test:
     runs-on: ubuntu-latest
+    continue-on-error: ${{matrix.emacs_version == 'snapshot'}}
+
     strategy:
-      fail-fast: false
       matrix:
-        emacs_version:
-          - 27.1
-          - 27.2
-        ignore_warnings:
-          - true
-        include:
-          - emacs_version: snapshot
-            ignore_warnings: false
+        emacs_version: ['27.1', '27.2', 'snapshot']
+
     steps:
-      - uses: actions/checkout@v2
-      - uses: purcell/setup-emacs@master
-        with:
-          version: ${{ matrix.emacs_version }}
-      - uses: leotaku/elisp-check@master
-        with:
-          file: blamer.el
-          ignore_warnings: ${{ matrix.ignore_warnings }}
-      - uses: leotaku/elisp-check@master
-        with:
-          check: ert
-          ignore_warnings: ${{ matrix.ignore_warnings }}
-          file: test.el
+    - name: Set up Emacs
+      uses: purcell/setup-emacs@master
+      with:
+        version: ${{matrix.emacs_version}}
+
+    - name: Install Eldev
+      run: curl -fsSL https://raw.github.com/doublep/eldev/master/webinstall/github-eldev | sh
+
+    - name: Check out the source code
+      uses: actions/checkout@v2
+
+    - name: Test the project
+      run: |
+        eldev prepare && eldev -p -dtT -C test
+        eldev prepare && eldev -p -dtT -C compile --warnings-as-errors blamer.el

@@ -13,6 +13,7 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 #+BEGIN_SRC emacs-lisp
 (use-package blamer
   :ensure t
+  :bind (("s-i" . blamer-show-commit-info))
   :defer 20
   :custom
   (blamer-idle-time 0.3)
@@ -30,6 +31,7 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 #+BEGIN_SRC emacs-lisp
 (use-package blamer
   :quelpa ((blamer :fetcher github :repo "artawower/blamer.el") :upgrade t)
+  :bind (("s-i" . blamer-show-commit-info))
   :custom
   (blamer-idle-time 0.3)
   (blamer-min-offset 70)
@@ -53,6 +55,7 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 *config.el*
 #+BEGIN_SRC emacs-lisp
 (use-package blamer
+  :bind (("s-i" . blamer-show-commit-info))
   :defer 20
   :custom
   (blamer-idle-time 0.3)
@@ -96,6 +99,13 @@ Can accept
 - ='selected= - blamer will show commit info for every selected line.
 - ='visual= - blamer will show info only about one line.
 - ='both= - works with both states.
+- ='overlay-popup= - nice overlay popup (see images/blamer-pretty-popup-dark.jpg)
+  *Warning* The 'overlay-popup feature highly dependent on you custom fonts, it may have worse alignment.
+**** Overlay popup position
+=blamer--overlay-popup-position= - is position for the overlay popup, it could be:
+- ='bottom=
+- ='top=
+- ='smart= - will choose the better popup position, in most cases it will prefer center
 **** Max blamer lines in selected mode
 If more then 30 lines will selected, blamer will not try to execute git commands.
 =(setq blamer-max-lines 30)=
