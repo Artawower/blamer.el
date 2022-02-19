@@ -183,23 +183,36 @@ If not will use background from `blamer-face'"
   :group 'blamer)
 
 (defface blamer-pretty-border-face
-  '((t :inherit font-lock-variable-name-face
-       :background nil))
+  `((t :inherit font-lock-variable-name-face
+       :italic nil
+       :background nil
+       :height ,(face-attribute 'default :height)
+       :font ,(face-attribute 'default :font)))
   "Face for pretty blamer borders."
   :group 'blamer)
 
 (defface blamer-pretty-commit-message-face
-  '((t :inherit font-lock-string-face))
+  `((t :inherit font-lock-string-face
+       :italic nil
+       :height ,(face-attribute 'default :height)
+       :font ,(face-attribute 'default :font)))
   "Face for pretty commit messages."
   :group 'blamer)
 
 (defface blamer-pretty-meta-keywords-face
-  '((t :inherit font-lock-function-name-face))
+  `((t :inherit font-lock-function-name-face
+       :italic nil
+       :height ,(face-attribute 'default :height)
+       :font ,(face-attribute 'default :font)))
   "Face for pretty keywords."
   :group 'blamer)
 
 (defface blamer-pretty-meta-data-face
-  '((t :inherit font-lock-variable-name-face))
+  `((t :inherit font-lock-variable-name-face
+       :italic nil
+       :height ,(face-attribute 'default :height)
+       :font ,(face-attribute 'default :font)))
+
   "Face for pretty meta information."
   :group 'blamer)
 
@@ -524,13 +537,14 @@ Return cons of result and count of lines."
                         (save-excursion
                           (back-to-indentation)
                           (current-column))))
-         (left-offset-line (make-string left-offset ? ))
+         (left-offset-line (blamer--prettify-border (make-string left-offset ? )))
          (top-left-corner (when enable-borders-p (blamer--prettify-border (char-to-string (nth 0 blamer-border-lines)))))
          (border-horizontal-line (when enable-borders-p (blamer--prettify-border (make-string render-length (nth 1 blamer-border-lines)))))
          (top-right-corner (when enable-borders-p (blamer--prettify-border (char-to-string (nth 2 blamer-border-lines)))))
          (border-vertical-line (when enable-borders-p (blamer--prettify-border (char-to-string (nth 3 blamer-border-lines)))))
          (bottom-right-corner (when enable-borders-p (blamer--prettify-border (char-to-string (nth 4 blamer-border-lines)))))
          (bottom-left-corner (when enable-borders-p (blamer--prettify-border (char-to-string (nth 5 blamer-border-lines)))))
+         (padding (blamer--prettify-border " "))
          (res (concat left-offset-line top-left-corner border-horizontal-line top-right-corner "\n"))
          splited-msgs)
 
@@ -541,10 +555,10 @@ Return cons of result and count of lines."
     (dolist (m splited-msgs)
       (setq res (concat res
                         left-offset-line
-                        border-vertical-line " "
+                        border-vertical-line padding
                         m
-                        (when (< (length m) render-length) (make-string (- render-length (length m) left-right-padding) ? ))
-                        " " border-vertical-line "\n")))
+                        (when (< (length m) render-length) (blamer--prettify-border (make-string (- render-length (length m) left-right-padding) ? )))
+                        padding border-vertical-line "\n")))
 
     (setq res (concat res left-offset-line bottom-left-corner border-horizontal-line bottom-right-corner))
     (if (eq blamer--overlay-popup-position 'top)
@@ -567,7 +581,7 @@ when not provided `blamer-type' will be used."
                          ,(concat (blamer--prettify-keyword "date:   ")
                                   (blamer--prettify-meta-data
                                    (concat (plist-get commit-info :commit-date) " " (plist-get commit-info :commit-time))))
-                         " "
+                         ,(blamer--prettify-border " ")
                          ,(blamer--prettify-commit-message (or (plist-get commit-info :commit-message) ""))))
              (commit-descriptions (mapcar #'blamer--prettify-commit-message (plist-get commit-info :commit-description)))
              (msg-lines (append msg-list commit-descriptions))
