@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (a "1.0.0"))
-;; Version: 0.4.0
+;; Version: 0.4.1
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -767,10 +767,11 @@ will appear after BLAMER-IDLE-TIME. It works only inside git repo"
 
 TYPE - optional parameter, by default will use `overlay-popup'."
   (interactive)
-  (blamer--reset-state)
-  (blamer--render (or type 'overlay-popup))
-  (blamer--preserve-state)
-  (add-hook 'post-command-hook #'blamer--reset-state-once nil t))
+  (when (blamer--git-exist-p)
+    (blamer--reset-state)
+    (blamer--render (or type 'overlay-popup))
+    (blamer--preserve-state)
+    (add-hook 'post-command-hook #'blamer--reset-state-once nil t)))
 
 (provide 'blamer)
 ;;; blamer.el ends here
