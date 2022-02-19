@@ -767,10 +767,11 @@ will appear after BLAMER-IDLE-TIME. It works only inside git repo"
 
 TYPE - optional parameter, by default will use `overlay-popup'."
   (interactive)
-  (blamer--reset-state)
-  (blamer--render (or type 'overlay-popup))
-  (blamer--preserve-state)
-  (add-hook 'post-command-hook #'blamer--reset-state-once nil t))
+  (when (blamer--git-exist-p)
+    (blamer--reset-state)
+    (blamer--render (or type 'overlay-popup))
+    (blamer--preserve-state)
+    (add-hook 'post-command-hook #'blamer--reset-state-once nil t)))
 
 (provide 'blamer)
 ;;; blamer.el ends here
