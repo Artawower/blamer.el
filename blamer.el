@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (a "1.0.0"))
-;; Version: 0.4.1
+;; Version: 0.4.2
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -86,7 +86,6 @@
   "Format entire commit string."
   :group 'blamer
   :type 'string)
-
 
 (defcustom blamer-idle-time 0.5
   "Seconds before commit info show."
@@ -172,6 +171,11 @@ length."
 (defcustom blamer-smart-background-p t
   "When enable blamer will try to find background.
 If not will use background from `blamer-face'"
+  :group 'blamer
+  :type 'boolean)
+
+(defcustom blamer-force-truncate-long-line t
+  "When `truncate-lines' mode is disabled you can force truncate long commit lines."
   :group 'blamer
   :type 'boolean)
 
@@ -359,6 +363,15 @@ Will show the available `blamer-bindings'."
       (format blamer-entire-formatter msg)
     msg))
 
+(defun blamer--real-window-width ()
+  "Get real visible width of the window.
+Taking into account the line number column."
+  ;; NOTE https://github.com/Artawower/blamer.el/issues/8
+  (let ((line-number-offset (if (bound-and-true-p display-line-numbers-mode)
+                                (+ (or (ignore-errors (line-number-display-width)) 0) 2)
+                              0)))
+    (- (window-width) line-number-offset)))
+
 (defun blamer--format-commit-info (commit-hash
                                    commit-message
                                    author
@@ -370,7 +383,7 @@ Will show the available `blamer-bindings'."
   "Format commit info into display message.
 COMMIT-HASH - hash of current commit.
 COMMIT-MESSAGE - message of current commit, can be null
-AUTHOR - name of commiter
+AUTHOR - name of committer
 DATE - date in format YYYY-DD-MM
 TIME - time in format HH:MM:SS
 OFFSET - additional offset for commit message
@@ -393,14 +406,10 @@ COMMIT-INFO - all the commit information, for `blamer--apply-bindings'"
          (formatted-message (blamer--apply-bindings formatted-message commit-info))
          (additional-offset (if blamer-offset-per-symbol
                                 (/ (string-width formatted-message) blamer-offset-per-symbol) 0))
-         ;; NOTE https://github.com/Artawower/blamer.el/issues/8
-         (line-number-offset (if (bound-and-true-p display-line-numbers-mode)
-                                 (+ (or (ignore-errors (line-number-display-width)) 0) 2)
-                               0))
-         (offset (cond ((eq blamer-view 'overlay-right) (- (window-width)
+
+         (offset (cond ((eq blamer-view 'overlay-right) (- (blamer--real-window-width)
                                                            (string-width formatted-message)
-                                                           (string-width (thing-at-point 'line))
-                                                           line-number-offset))
+                                                           (string-width (thing-at-point 'line))))
                        (offset offset)
                        (t 0)))
          (offset (+ additional-offset offset))
@@ -452,6 +461,44 @@ Return nil if error."
 
     parsed-commit-info))
 
+(defun blamer--split-with-preserved-spaces (string separator)
+  "Split STRING by SEPARATOR with preserved SEPARATOR."
+
+  (cl-loop with seplen = (length separator)
+           with len = (length string)
+           with start = 0
+           with next = seplen
+           for end = (or (cl-search separator string :start2 next) len)
+           for chunk = (substring string start end)
+           collect chunk
+           while (< end len)
+           do (setf start end next (+ seplen end))))
+
+(defun blamer--get-available-width-before-window-end ()
+  "Return count of chars before window end.
+
+This method is needed because sometimes using Emacs without string truncation
+the string has a pseudo-break for the first space character and it is impossible
+to find the real width before the current point and the end of the window."
+
+  (let* ((current-line (string-trim (thing-at-point 'line)))
+         (splited-lines (blamer--split-with-preserved-spaces current-line " "))
+         (current-window-width (blamer--real-window-width))
+         (last-fake-line-length 0))
+    (dolist (l splited-lines)
+      (setq last-fake-line-length
+            (cond ((> (length l) current-window-width) (% (length l) current-window-width))
+                  ((> (+ last-fake-line-length (length l)) current-window-width) (% (+ last-fake-line-length (length l)) current-window-width))
+                  (t (+ last-fake-line-length (length l))))))
+
+    (- current-window-width last-fake-line-length)))
+
+(defun blamer--maybe-normalize-truncated-line (text)
+  "Disable line break for truncated line by truncated TEXT for available width."
+  (if (and (not truncate-lines) blamer-force-truncate-long-line)
+      (truncate-string-to-width text (blamer--get-available-width-before-window-end))
+    text))
+
 (defun blamer--create-popup-msg (commit-info)
   "Handle current COMMIT-INFO."
   (let* ((offset (max (- (or blamer-min-offset 0) (length (thing-at-point 'line))) 0))
@@ -462,7 +509,8 @@ Return nil if error."
                                                     (plist-get commit-info :commit-date)
                                                     (plist-get commit-info :commit-time)
                                                     offset
-                                                    commit-info)))
+                                                    commit-info))
+         (popup-message (blamer--maybe-normalize-truncated-line popup-message)))
 
     (when (and commit-author (not (eq commit-author "")))
       popup-message)))
@@ -664,7 +712,7 @@ Optional TYPE argument will override global `blamer-type'."
 (defun blamer--preserve-state ()
   "Preserve current editor state for next iteration."
   (setq blamer--previous-line-number (line-number-at-pos))
-  (setq blamer--previous-window-width (window-width))
+  (setq blamer--previous-window-width (blamer--real-window-width))
   (setq blamer--previous-line-length (length (thing-at-point 'line)))
   (setq blamer--previous-point (point))
   (setq blamer--previous-region-active-p (region-active-p)))
@@ -688,7 +736,7 @@ LOCAL-TYPE is force replacement of current `blamer-type' for handle rendering."
                    (and (eq type 'overlay-popup) (not (use-region-p)))
                    (and (eq type 'selected) (use-region-p)))
                (or (not blamer--previous-line-number)
-                   (not (eq blamer--previous-window-width (window-width)))
+                   (not (eq blamer--previous-window-width (blamer--real-window-width)))
                    (not (eq blamer--previous-line-number (line-number-at-pos)))
                    (not (eq blamer--previous-line-length (length (thing-at-point 'line))))))
 
@@ -752,7 +800,7 @@ will appear after BLAMER-IDLE-TIME. It works only inside git repo"
   "Reset all blamer side-effect like overlay/timers only once."
   (when (or (not blamer--previous-point)
             (not (eq blamer--previous-point (point)))
-            (not (eq blamer--previous-window-width (window-width)))
+            (not (eq blamer--previous-window-width (blamer--real-window-width)))
             (not (eq blamer--previous-line-length (length (thing-at-point 'line)))))
     (blamer--reset-state)
     (remove-hook 'post-command-hook #'blamer--reset-state-once t)
