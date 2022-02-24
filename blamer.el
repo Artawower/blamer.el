@@ -481,14 +481,14 @@ This method is needed because sometimes using Emacs without string truncation
 the string has a pseudo-break for the first space character and it is impossible
 to find the real width before the current point and the end of the window."
 
-  (let* ((current-line (thing-at-point 'line))
+  (let* ((current-line (string-trim (thing-at-point 'line)))
          (splited-lines (blamer--split-with-preserved-spaces current-line " "))
          (current-window-width (blamer--real-window-width))
          (last-fake-line-length 0))
     (dolist (l splited-lines)
       (setq last-fake-line-length
             (cond ((> (length l) current-window-width) (% (length l) current-window-width))
-                  ((> (+ last-fake-line-length (length l)) current-window-width) (length l))
+                  ((> (+ last-fake-line-length (length l)) current-window-width) (% (+ last-fake-line-length (length l)) current-window-width))
                   (t (+ last-fake-line-length (length l))))))
 
     (- current-window-width last-fake-line-length)))
