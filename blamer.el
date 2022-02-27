@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (a "1.0.0"))
-;; Version: 0.4.2
+;; Version: 0.4.3
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -363,13 +363,17 @@ Will show the available `blamer-bindings'."
       (format blamer-entire-formatter msg)
     msg))
 
+(defun blamer--get-line-number-column-width ()
+  "Return char size of left line numbers when line numbers enabled."
+  (if (bound-and-true-p display-line-numbers-mode)
+      (+ (or (ignore-errors (line-number-display-width)) 0) 0)
+    0))
+
 (defun blamer--real-window-width ()
   "Get real visible width of the window.
 Taking into account the line number column."
   ;; NOTE https://github.com/Artawower/blamer.el/issues/8
-  (let ((line-number-offset (if (bound-and-true-p display-line-numbers-mode)
-                                (+ (or (ignore-errors (line-number-display-width)) 0) 2)
-                              0)))
+  (let ((line-number-offset (blamer--get-line-number-column-width)))
     (- (window-width) line-number-offset)))
 
 (defun blamer--format-commit-info (commit-hash
@@ -461,42 +465,18 @@ Return nil if error."
 
     parsed-commit-info))
 
-(defun blamer--split-with-preserved-spaces (string separator)
-  "Split STRING by SEPARATOR with preserved SEPARATOR."
-
-  (cl-loop with seplen = (length separator)
-           with len = (length string)
-           with start = 0
-           with next = seplen
-           for end = (or (cl-search separator string :start2 next) len)
-           for chunk = (substring string start end)
-           collect chunk
-           while (< end len)
-           do (setf start end next (+ seplen end))))
-
 (defun blamer--get-available-width-before-window-end ()
-  "Return count of chars before window end.
+  "Return count of chars before window end."
 
-This method is needed because sometimes using Emacs without string truncation
-the string has a pseudo-break for the first space character and it is impossible
-to find the real width before the current point and the end of the window."
-
-  (let* ((current-line (string-trim (thing-at-point 'line)))
-         (splited-lines (blamer--split-with-preserved-spaces current-line " "))
-         (current-window-width (blamer--real-window-width))
-         (last-fake-line-length 0))
-    (dolist (l splited-lines)
-      (setq last-fake-line-length
-            (cond ((> (length l) current-window-width) (% (length l) current-window-width))
-                  ((> (+ last-fake-line-length (length l)) current-window-width) (% (+ last-fake-line-length (length l)) current-window-width))
-                  (t (+ last-fake-line-length (length l))))))
-
-    (- current-window-width last-fake-line-length)))
+  (- (blamer--real-window-width)
+     (save-excursion
+       (end-of-line)
+       (- (point) (beginning-of-visual-line)))))
 
 (defun blamer--maybe-normalize-truncated-line (text)
   "Disable line break for truncated line by truncated TEXT for available width."
   (if (and (not truncate-lines) blamer-force-truncate-long-line)
-      (truncate-string-to-width text (blamer--get-available-width-before-window-end))
+      (truncate-string-to-width text (- (blamer--get-available-width-before-window-end) (blamer--get-line-number-column-width)))
     text))
 
 (defun blamer--create-popup-msg (commit-info)
