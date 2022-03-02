@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (a "1.0.0"))
-;; Version: 0.4.3
+;; Version: 0.4.4
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -509,9 +509,8 @@ Return nil if error."
 
 (defun blamer--get-local-name (filename)
   "Return local FILENAME if path is in the tramp format."
-  (if (file-remote-p default-directory)
-      (tramp-file-name-localname
-       (tramp-dissect-file-name filename))
+  (if (and (file-remote-p default-directory) filename)
+      (tramp-file-name-localname (tramp-dissect-file-name filename))
     filename))
 
 (defun blamer--apply-tooltip(text commit-info)
