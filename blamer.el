@@ -4,8 +4,8 @@
 
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
-;; Package-Requires: ((emacs "27.1") (a "1.0.0"))
-;; Version: 0.4.4
+;; Package-Requires: ((emacs "27.1"))
+;; Version: 0.4.5
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -32,7 +32,6 @@
 (require 'simple)
 (require 'time-date)
 (require 'tramp)
-(require 'a)
 
 (defconst blamer--regexp-info
   (concat "^(?\\(?1:[^\s]+\\) [^\s]*[[:blank:]]?\(\\(?2:[^\n]+\\)"
@@ -369,6 +368,14 @@ Will show the available `blamer-bindings'."
       (+ (or (ignore-errors (line-number-display-width)) 0) 0)
     0))
 
+(defun blamer--plist-merge (&rest plists)
+  "Create a single property list from all PLISTS."
+  (let ((rtn (pop plists)))
+    (dolist (plist plists rtn)
+      (setq rtn (plist-put rtn
+                           (pop plist)
+                           (pop plist))))))
+
 (defun blamer--real-window-width ()
   "Get real visible width of the window.
 Taking into account the line number column."
@@ -402,9 +409,9 @@ COMMIT-INFO - all the commit information, for `blamer--apply-bindings'"
                                                                    (blamer--format-commit-message commit-message))))
 
          (formatted-message (propertize formatted-message
-                                        'face (flatten-tree
-                                               (a-merge (face-all-attributes 'blamer-face (selected-frame))
-                                                        `((:background ,(blamer--get-background-color)))))
+                                        'face (blamer--plist-merge
+                                               (flatten-tree (face-all-attributes 'blamer-face (selected-frame)))
+                                                        `(:background ,(blamer--get-background-color)))
                                         'cursor t))
          (formatted-message (blamer--apply-tooltip formatted-message commit-info))
          (formatted-message (blamer--apply-bindings formatted-message commit-info))
