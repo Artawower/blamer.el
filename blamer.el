@@ -270,6 +270,9 @@ author name by left click and copying commit hash by right click.
 (defvar blamer--overlays '()
   "Current active overlays for git blame messages.")
 
+(defvar blamer--block-render-p nil
+  "Lock rendering, useful for external packages.")
+
 (defvar-local blamer--current-author nil
   "Git.name for current repository.")
 
@@ -411,7 +414,7 @@ COMMIT-INFO - all the commit information, for `blamer--apply-bindings'"
          (formatted-message (propertize formatted-message
                                         'face (blamer--plist-merge
                                                (flatten-tree (face-all-attributes 'blamer-face (selected-frame)))
-                                                        `(:background ,(blamer--get-background-color)))
+                                               `(:background ,(blamer--get-background-color)))
                                         'cursor t))
          (formatted-message (blamer--apply-tooltip formatted-message commit-info))
          (formatted-message (blamer--apply-bindings formatted-message commit-info))
@@ -682,9 +685,10 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
   "Function for checking current active blamer type before rendering with delay.
 Optional TYPE argument will override global `blamer-type'."
   (let ((blamer-type (or type blamer-type)))
-    (unless (and (or (eq blamer-type 'overlay-popup)
-                     (eq blamer-type 'visual))
-                 (use-region-p))
+    (unless (or (and (or (eq blamer-type 'overlay-popup)
+                         (eq blamer-type 'visual))
+                     (use-region-p))
+                blamer--block-render-p)
       (blamer--render blamer-type))))
 
 (defun blamer--render-commit-info-with-delay ()
@@ -713,10 +717,11 @@ LOCAL-TYPE is force replacement of current `blamer-type' for handle rendering."
          (clear-overlays-p (or long-line-p region-deselected-p))
          (type (or local-type blamer-type)))
 
-    (when clear-overlays-p
+    (when (and clear-overlays-p (not blamer--block-render-p))
       (blamer--clear-overlay))
 
     (when (and (not long-line-p)
+               (not blamer--block-render-p)
                (or (eq type 'both)
                    (and (eq type 'visual) (not (use-region-p)))
                    (and (eq type 'overlay-popup) (not (use-region-p)))
