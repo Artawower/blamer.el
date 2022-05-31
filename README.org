@@ -13,7 +13,8 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 #+BEGIN_SRC emacs-lisp
 (use-package blamer
   :ensure t
-  :bind (("s-i" . blamer-show-commit-info))
+  :bind (("s-i" . blamer-show-commit-info)
+         ("C-c i" . ("s-i" . blamer-show-posframe-commit-info)))
   :defer 20
   :custom
   (blamer-idle-time 0.3)
@@ -31,7 +32,8 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 #+BEGIN_SRC emacs-lisp
 (use-package blamer
   :quelpa ((blamer :fetcher github :repo "artawower/blamer.el") :upgrade t)
-  :bind (("s-i" . blamer-show-commit-info))
+  :bind (("s-i" . blamer-show-commit-info)
+         ("C-c i" . ("s-i" . blamer-show-posframe-commit-info)))
   :custom
   (blamer-idle-time 0.3)
   (blamer-min-offset 70)
@@ -100,6 +102,7 @@ Can accept
 - ='visual= - blamer will show info only about one line.
 - ='both= - works with both states.
 - ='overlay-popup= - nice overlay popup (see images/blamer-pretty-popup-dark.jpg)
+- ='posframe-popup= - posframe popup (see images/posframe.png)
   *Warning* The 'overlay-popup feature highly dependent on you custom fonts, it may have worse alignment.
 **** Overlay popup position
 =blamer--overlay-popup-position= - is position for the overlay popup, it could be:
@@ -191,8 +194,13 @@ Also, you can use [[https://github.com/emacsmirror/git-timemachine][timemachine]
 * Contribute
 Run before push
 #+BEGIN_SRC bash
-emacs -batch -l ert -l blamer.el -l test.el -f ert-run-tests-batch-and-exit
+eldev prepare && eldev -p -dtT -C test
 #+END_SRC
+
+For more information check [[https://github.com/doublep/eldev/][this]] repo
+* More images
+[[./images/blamer-pretty-popup-dark.jpg]]
+[[./images/posframe.png]]
 
 * TODO Blamer.el plans [16/16]
 - [X] Get necessary information about current line under cursor
