@@ -80,7 +80,7 @@ Current style for blame messages, now can be =overlay= and =overlay-right=.
 **** Template for datetime
 =(setq blamer-datetime-formatter "[%s]")=
 **** Template for commit message
-=(setq blamer-commit-formatter "● %s")=
+=(setq blamer-commit-formatter " ● %s")=
 
 
 All formatters can be nil.
@@ -137,7 +137,7 @@ For example, you can write function for showing commit datetime inside tooltip:
     (message "%s" commit-info)
     (format "%s - %s" commit-date commit-time)))
 
-(setq blamer-tooltip-function 'my-blamer-tooltip-func
+(setq blamer-tooltip-function 'my-blamer-tooltip-func)
 #+END_SRC
 
 
