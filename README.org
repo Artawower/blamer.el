@@ -45,6 +45,22 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
   :config
   (global-blamer-mode 1))
   #+END_SRC
+*** Straight
+#+BEGIN_SRC emacs-lisp
+(use-package blamer
+  :straight (:host github :repo "artawower/blamer.el")
+  :bind (("s-i" . blamer-show-commit-info))
+  :custom
+  (blamer-idle-time 0.3)
+  (blamer-min-offset 70)
+  :custom-face
+  (blamer-face ((t :foreground "#7a88cf"
+                    :background nil
+                    :height 140
+                    :italic t)))
+  :config
+  (global-blamer-mode 1))
+#+END_SRC
 
 *** doom
 *packages.el*
