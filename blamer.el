@@ -197,7 +197,7 @@ If not will use background from `blamer-face'"
 
 (defface blamer-face
   '((t :foreground "#7a88cf"
-       :background nil
+       :background unspecified
        :italic t))
   "Face for blamer info."
   :group 'blamer)
@@ -205,7 +205,7 @@ If not will use background from `blamer-face'"
 (defface blamer-pretty-border-face
   `((t :inherit font-lock-variable-name-face
        :italic nil
-       :background nil
+       :background unspecified
        :height ,(face-attribute 'default :height)
        :font ,(face-attribute 'default :font)))
   "Face for pretty blamer borders."
