@@ -218,6 +218,9 @@ For more information check [[https://github.com/doublep/eldev/][this]] repo
 [[./images/blamer-pretty-popup-dark.jpg]]
 [[./images/posframe.png]]
 
+* Similar packages
+ - [[https://github.com/emacs-sideline/sideline-blame][Sideline blame]]
+
 * TODO Blamer.el plans [16/16]
 - [X] Get necessary information about current line under cursor
 - [X] Get commit info by current hash (if necessary)
