@@ -52,16 +52,16 @@
 (defconst blamer--commit-message-regexp "\n\n[\s]+\\(?1:[^\']+\\):?"
   "Regexp for commit message parsing.")
 
-(defconst blamer--git-author-cmd "git config --get user.name"
-  "Command for getting current git user name.")
+(defconst blamer--git-author-cmd '("config" "--get" "user.name")
+  "Command for getting current git user name via `vc-git'.")
 
-(defconst blamer--git-repo-cmd "git rev-parse --is-inside-work-tree"
+(defconst blamer--git-repo-cmd '("rev-parse" "--is-inside-work-tree")
   "Command for detect git repo.")
 
-(defconst blamer--git-blame-cmd "git blame -L %s,%s %s"
+(defconst blamer--git-blame-cmd '("blame"  "-L")
   "Command for get blame of current line.")
 
-(defconst blamer--git-commit-message "git log -n1 %s"
+(defconst blamer--git-commit-message '("log"  "-n1")
   "Command for get commit message.")
 
 (defconst blamer--current-time-text "Now"
@@ -346,7 +346,7 @@ Will show the available `blamer-bindings'."
 (defun blamer--git-exist-p ()
   "Return t if .git exist."
   (when-let* ((file-name (blamer--get-local-name (buffer-file-name)))
-              (git-exist-stdout (shell-command-to-string blamer--git-repo-cmd)))
+              (git-exist-stdout (apply #'vc-git--run-command-string nil blamer--git-repo-cmd)))
     (string-match "^true" git-exist-stdout)))
 
 (defun blamer--clear-overlay ()
@@ -487,7 +487,7 @@ COMMIT-INFO - all the commit information, for `blamer--apply-bindings'"
 (defun blamer--get-commit-messages (hash)
   "Get commit message by provided HASH.
 Return nil if error."
-  (let* ((git-commit-res (shell-command-to-string (format blamer--git-commit-message hash)))
+  (let* ((git-commit-res (apply #'vc-git--run-command-string nil (append blamer--git-commit-message (list hash))))
          (has-error (or (blamer--git-cmd-error-p git-commit-res) (eq (length git-commit-res) 0)))
          commit-message)
     (unless has-error
@@ -850,11 +850,11 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
                                   (line-number-at-pos)))
              (file-name (blamer--get-local-name (buffer-file-name)))
              (file-name (when file-name (replace-regexp-in-string " " "\\\\\  " file-name)))
-             (cmd (format blamer--git-blame-cmd start-line-number end-line-number file-name))
-             (blame-cmd-res (when file-name (shell-command-to-string cmd)))
+             (blame-cmd-res (when file-name
+                              (apply #'vc-git--run-command-string file-name
+                                     (append blamer--git-blame-cmd
+                                             (list (format "%s,%s" start-line-number end-line-number))))))
              (blame-cmd-res (when blame-cmd-res (butlast (split-string blame-cmd-res "\n")))))
-
-
 
         (blamer--clear-overlay)
 
@@ -959,7 +959,7 @@ will appear after BLAMER-IDLE-TIME.  It works only inside git repo"
     (when (and (not blamer--current-author)
                blamer-author-formatter
                is-git-repo)
-      (setq-local blamer--current-author (replace-regexp-in-string "\n\\'" "" (shell-command-to-string blamer--git-author-cmd))))
+      (setq-local blamer--current-author (replace-regexp-in-string "\n\\'" "" (apply #'vc-git--run-command-string nil blamer--git-author-cmd))))
     (if (and blamer-mode (buffer-file-name) is-git-repo)
         (progn
           (add-hook 'post-command-hook #'blamer--try-render nil t)
