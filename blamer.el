@@ -204,7 +204,7 @@ This feature required Emacs built with `imagemagick'"
   :type 'string)
 
 (defcustom blamer-avatar-regexps-uploaders-alist
-  '(("github" . ("https://github.com" blamer--github-avatar-uploader))
+  '(("github" . ("https://api.github.com/search/users" blamer--github-avatar-uploader))
     ("gitlab" . ("https://gitlab.com" blamer--gitlab-avatar-uploader)))
   "List of regexps for uploaders.
 Each element is a cons cell (REGEXP . FUNCTION)."
@@ -517,7 +517,7 @@ Return nil if error."
          (commit-description (cdr commit-messages))
          (raw-commit-message (nth 1 commit-messages))
          (avatar (when (and blamer-show-avatar-p (not uncommitted))
-                   (blamer--get-avatar raw-commit-author author-email)))
+                   (blamer--get-avatar author-email)))
          (parsed-commit-info `(:commit-hash ,commit-hash
                                             :author-email ,author-email
                                             :commit-author ,commit-author
@@ -531,11 +531,20 @@ Return nil if error."
 
     parsed-commit-info))
 
-(defun blamer--github-avatar-uploader (remote-url &rest author)
-  "Download the AUTHOR avatar from REMOTE-URL."
-  (let* ((file-name (format "/%s.png" author))
-         (url (concat remote-url file-name)))
-    (blamer--upload-avatar url file-name)))
+(defun blamer--github-avatar-uploader (remote-url author-email)
+  "Download the author avatar from REMOTE-URL using the AUTHOR-EMAIL."
+  (let* ((url (concat remote-url "?q=" author-email))
+         (host-name (progn (string-match "https?://\\(?1:.*\\)/?" remote-url)
+                          (match-string 1 remote-url)))
+         (response (url-retrieve-synchronously url))
+         (response-data (with-current-buffer response
+                         (goto-char (point-min))
+                         (search-forward "\n\n")
+                         (json-read)))
+         (avatar-url (cdr (assoc 'avatar_url (elt (cdr (assoc 'items response-data)) 0))))
+         (file-name (format "%s.png" author-email)))
+    (blamer--upload-avatar avatar-url file-name host-name)))
+
 
 (defun blamer--gitlab-avatar-url (author-email)
   "Get the avatar URL for the email address AUTHOR-EMAIL on GitLab."
@@ -546,13 +555,13 @@ Return nil if error."
         (let ((json-data (json-read)))
           (gethash "avatar_url" json-data))))))
 
-(defun blamer--gitlab-avatar-uploader (remote-url &optional author author-email)
+(defun blamer--gitlab-avatar-uploader (remote-url &optional author-email)
   "Upload avatar from REMOTE-URL for gitlab using AUTHOR-EMAIL or AUTHOR."
-  (let* ((hostname (progn (string-match "https?://\\(?1:.*\\)/?" remote-url)
+  (let* ((host-name (progn (string-match "https?://\\(?1:.*\\)/?" remote-url)
                           (match-string 1 remote-url)))
          (folder (concat (file-name-as-directory blamer-avatar-folder)
-                         (file-name-as-directory hostname)))
-         (filename (format "%s.png" author))
+                         (file-name-as-directory host-name)))
+         (filename (format "%s.png" author-email))
          (file-path (concat folder filename))
          (file-exist-p (file-exists-p file-path)))
 
@@ -565,18 +574,15 @@ Return nil if error."
                  (json-object-type 'hash-table)
                  (json-data (json-read-from-string json-string))
                  (avatar-url (gethash "avatar_url" json-data)))
-        (blamer--upload-avatar avatar-url filename hostname)))))
+        (blamer--upload-avatar avatar-url filename host-name)))))
 
-(defun blamer--upload-avatar (url file-name &optional original-host)
+(defun blamer--upload-avatar (url file-name host-name)
   "Download the avatar from URL and save it to the path as FILE-NAME.
-If ORIGINAL-HOST is provided, the avatar will be saved to the original
+HOST-NAME is the name of the host for caching.
 host folder.
 If the file already exists, return the path to the existing file."
-  (let* ((hostname (or original-host
-                       (progn (string-match "https?://\\(?1:.*\\)/?" url)
-                              (match-string 1 url))))
-         (folder (concat (file-name-as-directory blamer-avatar-folder)
-                         (file-name-as-directory hostname)))
+  (let* ((folder (concat (file-name-as-directory blamer-avatar-folder)
+                         (file-name-as-directory host-name)))
          (filepath (concat folder file-name)))
     (unless (file-exists-p filepath)
       (make-directory folder t))
@@ -593,7 +599,7 @@ The uploader functions and URLs are defined in `blamer-avatar-regexps-uploaders-
     (when uploader-pair
       uploader-pair)))
 
-(defun blamer--get-avatar (author author-email)
+(defun blamer--get-avatar (author-email)
   "Get avatar url for AUTHOR or AUTHOR-EMAIL.
 Function return current path for avatar url.
 Works only for github right now."
@@ -601,7 +607,7 @@ Works only for github right now."
               (uploader-fn-path (blamer--find-avatar-uploader remote-ref))
               (uploader-path (car uploader-fn-path))
               (uploader-fn (car (cdr uploader-fn-path)))
-              (file-path (funcall uploader-fn uploader-path author author-email)))
+              (file-path (funcall uploader-fn uploader-path author-email)))
     file-path))
 
 (defun blamer--get-available-width-before-window-end ()
