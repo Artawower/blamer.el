@@ -1,6 +1,8 @@
 #+TITLE: Blamer.el
 #+html: <img src="./images/evil-monkey.png" align="right" width="16%">
-[[https://github.com/artawower/blamer.el/actions/workflows/lint.yml/badge.svg]] [[https://melpa.org/packages/blamer-badge.svg]] [[http://stable.melpa.org/packages/blamer-badge.svg]] [[https://wakatime.com/badge/user/dc4b055e-22c9-4977-bee4-51539164ae23/project/6da6ddac-b13a-47e2-8025-9fee277f2d3c.svg]]
+[[https://github.com/artawower/blamer.el/actions/workflows/lint.yml/badge.svg]] [[https://melpa.org/packages/blamer-badge.svg]] [[http://stable.melpa.org/packages/blamer-badge.svg]] [[https://wakatime.com/badge/user/dc4b055e-22c9-4977-bee4-51539164ae23/project/6da6ddac-b13a-47e2-8025-9fee277f2d3c.svg]] [[https://github.com/artawower/blamer.el/actions/workflows/melpazoid.yml/badge.svg][https://github.com/artawower/blamer.el/actions/workflows/melpazoid.yml/badge.svg]] 
+
+
 
 A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/items?itemName=eamodio.gitlens][VS Code's GitLens plugin]] and [[https://github.com/APZelos/blamer.nvim][Vim plugin]]
 
