@@ -357,7 +357,7 @@ Will show the available `blamer-bindings'."
 
 (defun blamer--git-cmd-error-p (cmd-res)
   "Return t if CMD-RES contain error."
-  (string-match-p  "^fatal:" cmd-res))
+  (or (not cmd-res) (string-match-p  "^fatal:" cmd-res)))
 
 (defun blamer--truncate-time (time)
   "Remove seconds from TIME string."
