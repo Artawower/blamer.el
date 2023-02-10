@@ -198,6 +198,14 @@ This feature required Emacs built with `imagemagick'"
   :group 'blamer
   :type 'int)
 
+(defcustom blamer-default-avatar-url "https://git-scm.com/images/logos/logomark-orange@2x.png"
+  "Default avatar used when no avatar found.")
+
+(defcustom blamer-avatar-cache-time 3600
+  "Time in seconds to cache avatar."
+  :group 'blamer
+  :type 'int)
+
 (defcustom blamer-avatar-folder "~/.blamer/avatars/"
   "Folder for avatars."
   :group 'blamer
@@ -542,8 +550,10 @@ Return nil if error."
          (items (cdr (assoc 'items response-data)))
          (first-item (and (> (length items) 0) (elt items 0)))
          (avatar-url (and first-item (cdr (assoc 'avatar_url first-item)))))
-    (when avatar-url
-      (blamer--upload-avatar avatar-url file-path))))
+
+    (if avatar-url
+        (blamer--upload-avatar avatar-url file-path))
+    (blamer--upload-avatar blamer-default-avatar-url file-path)))
 
 
 (defun blamer--gitlab-avatar-url (author-email)
@@ -596,14 +606,25 @@ Works only for github right now."
               (uploader-fn (car (cdr uploader-fn-path)))
               (host-name (when (string-match "https?://\\(?1:.*\\)/?" uploader-path)
                            (match-string 1 uploader-path)))
+              (host-name (car (split-string host-name "/")))
               (folder (concat (file-name-as-directory blamer-avatar-folder)
                               (file-name-as-directory host-name)))
               (filename (format "%s.png" author-email))
-              (file-path (concat folder filename)))
+              (file-path (concat folder filename))
+              (cache-outdated-p (blamer--cache-outdated-p file-path)))
 
-    (if (file-exists-p file-path)
+    (if (and (file-exists-p file-path) (not cache-outdated-p))
         file-path
       (funcall uploader-fn uploader-path file-path author-email))))
+
+(defun blamer--cache-outdated-p (file-path)
+  "Check if the cache for FILE-PATH is outdated."
+  (let* ((attributes (file-attributes file-path))
+         (creation-time (nth 5 attributes))
+         (current-time (current-time)))
+
+    (> (time-to-seconds (time-subtract current-time creation-time))
+       blamer-avatar-cache-time)))
 
 (defun blamer--get-available-width-before-window-end ()
   "Return count of chars before window end."
