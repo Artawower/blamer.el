@@ -114,9 +114,9 @@ Will add additional space for each BLAMER-OFFSET-PER-SYMBOL"
 
 (defcustom blamer-type 'both
   "Type of blamer.
-'visual - show blame only for current line
-'selected - show blame only for selected line
-'both - both of them
+\\=visual - show blame only for current line
+\\=selected - show blame only for selected line
+\\=both - both of them
 
 This types are used only for single line blame.
 'overlay-popup - show commit info inside pretty overlay
@@ -153,7 +153,7 @@ place to paste popup."
   "List of lines and borders.  When value is nil, borders will not preset.
 Be careful! This config highly coupled with your current face!
 
-Alternative preset: '(?┌ ?─ ?┐ ?│ ?┘ ?└)"
+Alternative preset: \\=(?┌ ?─ ?┐ ?│ ?┘ ?└)"
   :group 'blamer
   :type 'alist)
 
@@ -282,7 +282,7 @@ Callback function applying plist argument:
 :commit-author - author name after formatting
 :raw-commit-author - raw author username if exist.
 :commit-date - date of commit. (string field)
-:commit-time - commit's time. (string field)
+:commit-time - commit time. (string field)
 :commit-message - message of commit.  If not exist will be get from
 `blamer-uncommitted-changes-message' variable.
 :raw-commit-message - Full message of commit.
@@ -291,7 +291,7 @@ For example you can pass such bindings for message
 author name by left click and copying commit hash by right click.
 \(without backslash)
 
-'((<mapvar> . (lambda (commit-info) (message (plist-get :commit-author))))
+\\=((<mapvar> . (lambda (commit-info) (message (plist-get :commit-author))))
   (<mapvar> . (lambda (commit-info) (kill-new (plist-get :commit-hash)))))"
   :group 'blamer
   :type 'alist)
@@ -653,7 +653,7 @@ Works only for github right now."
                                                     commit-info))
          (popup-message (blamer--maybe-normalize-truncated-line popup-message)))
 
-    (when (and commit-author (not (eq commit-author "")))
+    (when (and commit-author (not (string= commit-author "")))
       popup-message)))
 
 (defun blamer--get-background-color ()
