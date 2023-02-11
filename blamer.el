@@ -201,7 +201,7 @@ This feature required Emacs built with `imagemagick'"
 (defcustom blamer-default-avatar-url "https://git-scm.com/images/logos/logomark-orange@2x.png"
   "Default avatar used when no avatar found.")
 
-(defcustom blamer-avatar-cache-time 3600
+(defcustom blamer-avatar-cache-time 14400
   "Time in seconds to cache avatar."
   :group 'blamer
   :type 'int)
@@ -583,10 +583,8 @@ host folder.
 If the file already exists, return the path to the existing file."
   (unless (file-exists-p (file-name-directory file-path))
     (make-directory (file-name-directory file-path) t))
-  (if (file-exists-p file-path)
-      file-path
-    (url-copy-file url file-path)
-    file-path))
+  (url-copy-file url file-path t)
+  file-path)
 
 
 (defun blamer--find-avatar-uploader (remote-ref)
@@ -610,10 +608,11 @@ Works only for github right now."
               (folder (concat (file-name-as-directory blamer-avatar-folder)
                               (file-name-as-directory host-name)))
               (filename (format "%s.png" author-email))
-              (file-path (concat folder filename))
-              (cache-outdated-p (blamer--cache-outdated-p file-path)))
+              (file-path (concat folder filename)))
 
-    (if (and (file-exists-p file-path) (not cache-outdated-p))
+
+    (if (and (file-exists-p file-path)
+             (not (blamer--cache-outdated-p file-path)))
         file-path
       (funcall uploader-fn uploader-path file-path author-email))))
 
