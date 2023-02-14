@@ -39,7 +39,7 @@
   (require 'subr-x))
 
 (defconst blamer--regexp-info
-  (concat "^(?\\(?1:[^\s]+\\) [^\s]*[[:blank:]]?\(\\(?2:[^\n]+\\)"
+  (concat "^(?\\(?1:.\\{9\\}\\).*[[:blank:]]?\(\\(?2:[^\n]+\\)"
           "\s\\(?3:[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\)"
           "\s\\(?4:[0-9]\\{2\\}:[0-9]\\{2\\}:[0-9]\\{2\\}\\)")
 
@@ -201,8 +201,8 @@ This feature required Emacs built with `imagemagick'"
 (defcustom blamer-default-avatar-url "https://git-scm.com/images/logos/logomark-orange@2x.png"
   "Default avatar used when no avatar found.")
 
-(defcustom blamer-avatar-cache-time 14400
-  "Time in seconds to cache avatar."
+(defcustom blamer-avatar-cache-time 604800
+  "Time in seconds to cache avatar.  Default value is 1 week."
   :group 'blamer
   :type 'int)
 
