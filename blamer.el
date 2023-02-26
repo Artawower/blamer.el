@@ -517,7 +517,7 @@ Return nil if error."
 When INCLUDE-AVATAR-P provided and non-nil,
 avatar will be downloaded and included in the plist."
   (string-match blamer--regexp-info blame-msg)
-  (let* ((commit-hash (match-string 1 blame-msg))
+  (let* ((commit-hash (string-trim (match-string 1 blame-msg)))
          (raw-commit-author (match-string 2 blame-msg))
          (uncommitted (string= raw-commit-author "Not Committed Yet"))
          (commit-author (if (and (string= raw-commit-author blamer--current-author) blamer-self-author-name)
@@ -526,7 +526,7 @@ avatar will be downloaded and included in the plist."
          (commit-date (match-string 3 blame-msg))
          (commit-time (match-string 4 blame-msg))
          (commit-messages (blamer--get-commit-messages commit-hash))
-         (author-email (vc-git--run-command-string nil "log" "-1" "--pretty=format:%ae" commit-hash))
+         (author-email (vc-git--run-command-string nil "log" "-n1" "--pretty=format:%ae" commit-hash))
          (commit-message (car commit-messages))
          (commit-message (when commit-message (string-trim commit-message)))
          (commit-message (when (and blamer-commit-formatter commit-message)
@@ -567,8 +567,8 @@ avatar will be downloaded and included in the plist."
          (avatar-url (and first-item (cdr (assoc 'avatar_url first-item)))))
 
     (if avatar-url
-        (blamer--upload-avatar avatar-url file-path))
-    (blamer--upload-avatar blamer-default-avatar-url file-path)))
+        (blamer--upload-avatar avatar-url file-path)
+      (blamer--upload-avatar blamer-default-avatar-url file-path))))
 
 
 (defun blamer--gitlab-avatar-url (author-email)
@@ -631,7 +631,8 @@ Works only for github right now."
     (if (and (file-exists-p file-path)
              (not (blamer--cache-outdated-p file-path)))
         file-path
-      (funcall uploader-fn uploader-path file-path author-email))))
+      (funcall uploader-fn uploader-path file-path author-email))
+    ))
 
 (defun blamer--cache-outdated-p (file-path)
   "Check if the cache for FILE-PATH is outdated."
