@@ -159,6 +159,21 @@ For example, you can write function for showing commit datetime inside tooltip:
 #+END_SRC
 
 
+**** User avatar
+/Available in the posframe for github and gitlab only!/
+
+~blamer-show-avatar-p~ - if you want to show the user avatar in the posframe popup, you can set this variable to t.
+
+If you have an incorrect view of avatar or line breaks, try to play with this variables.
+~blamer-avatar-size~ - size of the avatar, default is 96px.
+~blamer-avatar-ratio~ - ratio of the avatar, default is 3x3.
+~blamer-default-avatar-url~ - default fallback url for not found avatars or users.
+~blamer-avatar-folder~ - folder for saving avatars, default is =~/.blamer/avatars/=
+~blamer-avatar-regexps-uploaders-alist~ - list of regexp patterns as car, and API URL and uploader fn as cdr.
+Useful for self-hosted gitlab or GitHub instances.
+
+
+
 
 * Interactive binding
 You can bind the mouse click event and pass custom handler. Where the handler is callback function with commit-info arg.
