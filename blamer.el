@@ -33,9 +33,9 @@
 (require 'posframe)
 (require 'url)
 (require 'vc-git)
+(require 'seq)
 
 (eval-when-compile
-  (require 'seq)
   (require 'subr-x))
 
 (defconst blamer--regexp-info
@@ -203,11 +203,6 @@ This feature required Emacs built with `imagemagick'"
   :group 'blamer
   :type 'cons)
 
-(defcustom blamer-default-avatar-url "https://git-scm.com/images/logos/logomark-orange@2x.png"
-  "Default avatar used when no avatar found."
-  :group 'blamer
-  :type 'string)
-
 (defcustom blamer-avatar-cache-time 604800
   "Time in seconds to cache avatar.  Default value is 1 week."
   :group 'blamer
@@ -223,6 +218,12 @@ This feature required Emacs built with `imagemagick'"
     ("gitlab" . ("https://gitlab.com" blamer--gitlab-avatar-uploader)))
   "List of regexps for uploaders.
 Each element is a cons cell (REGEXP . FUNCTION)."
+  :group 'blamer
+  :type 'list)
+
+(defcustom blamer-fallback-avatar-config
+  '("http://www.gravatar.com/avatar" blamer--fallback-avatar-uploader)
+  "Fallback avatar config."
   :group 'blamer
   :type 'list)
 
@@ -381,9 +382,7 @@ Will show the available `blamer-bindings'."
 ;; TODO: pass argument for pretty format to vc-git--run-command-string
 (defun blamer--prettify-time (date time)
   "Prettify DATE and TIME for nice commit message."
-  (let* ((parsed-time (decoded-time-set-defaults (parse-time-string (concat date "T" time))))
-         (now (decode-time (current-time)))
-         (seconds-ago (float-time (time-since (concat date "T" time))))
+  (let* ((seconds-ago (float-time (time-since (concat date "T" time))))
          (minutes-ago (if (eq seconds-ago 0) 0 (floor (/ seconds-ago 60))))
          (hours-ago (if (eq minutes-ago 0) 0 (floor (/ minutes-ago 60))))
          (days-ago (if (eq hours-ago 0) 0 (floor (/ hours-ago 24))))
@@ -391,7 +390,7 @@ Will show the available `blamer-bindings'."
          (months-ago (if (eq days-ago 0) 0 (floor (/ days-ago 30))))
          (years-ago (if (eq months-ago 0) 0 (floor (/ months-ago 12)))))
 
-    (cond ((or (time-equal-p now parsed-time) (< seconds-ago 60)) blamer--current-time-text)
+    (cond ((<= seconds-ago 60) blamer--current-time-text)
           ((< minutes-ago 60) (format "%s minutes ago" minutes-ago))
           ((= hours-ago 1) (format "Hour ago"))
           ((< hours-ago 24) (format "%s hours ago" hours-ago))
@@ -568,7 +567,9 @@ avatar will be downloaded and included in the plist."
 
     (if avatar-url
         (blamer--upload-avatar avatar-url file-path)
-      (blamer--upload-avatar blamer-default-avatar-url file-path))))
+      (funcall (cadr blamer-fallback-avatar-config)
+               (car blamer-fallback-avatar-config)
+               file-path author-email))))
 
 
 (defun blamer--gitlab-avatar-url (author-email)
@@ -579,6 +580,13 @@ avatar will be downloaded and included in the plist."
       (let ((json-object-type 'hash-table))
         (let ((json-data (json-read)))
           (gethash "avatar_url" json-data))))))
+
+(defun blamer--fallback-avatar-uploader (remote-url file-path author-email)
+  "Fallback function for upload avatars and save it.
+FILE-PATH - path to save avatar.
+AUTHOR-EMAIL - email of author.
+REMOTE-URL - url of resource to download avatar."
+  (blamer--upload-avatar (format "%s/%s?d=identicon" remote-url (md5 author-email)) file-path))
 
 (defun blamer--gitlab-avatar-uploader (remote-url file-path author-email)
   "Upload avatar from REMOTE-URL for gitlab using AUTHOR-EMAIL to FILE-PATH."
@@ -608,8 +616,9 @@ If the file already exists, return the path to the existing file."
 The uploader functions and URLs are defined in
 `blamer-avatar-regexps-uploaders-alist`."
   (let ((uploader-pair (assoc-default remote-ref blamer-avatar-regexps-uploaders-alist 'string-match)))
-    (when uploader-pair
-      uploader-pair)))
+    (if uploader-pair
+        uploader-pair
+      blamer-fallback-avatar-config)))
 
 (defun blamer--get-avatar (author-email)
   "Get avatar url for AUTHOR or AUTHOR-EMAIL.
@@ -627,12 +636,10 @@ Works only for github right now."
               (filename (format "%s.png" author-email))
               (file-path (concat folder filename)))
 
-
     (if (and (file-exists-p file-path)
              (not (blamer--cache-outdated-p file-path)))
         file-path
-      (funcall uploader-fn uploader-path file-path author-email))
-    ))
+      (funcall uploader-fn uploader-path file-path author-email))))
 
 (defun blamer--cache-outdated-p (file-path)
   "Check if the cache for FILE-PATH is outdated."
