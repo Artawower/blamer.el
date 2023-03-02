@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (posframe "1.1.7"))
-;; Version: 0.5.1
+;; Version: 0.6.0
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -22,20 +22,24 @@
 
 ;;; Commentary:
 ;; Package for displaying git information about the current line or
-;; about several selected lines. Works with git only.
+;; about several selected lines.  Works with git only.
 
 ;;; Code:
 
 (require 'files)
-(require 'seq)
-(require 'subr-x)
 (require 'simple)
 (require 'time-date)
 (require 'tramp)
 (require 'posframe)
+(require 'url)
+(require 'vc-git)
+(require 'seq)
+
+(eval-when-compile
+  (require 'subr-x))
 
 (defconst blamer--regexp-info
-  (concat "^(?\\(?1:[^\s]+\\) [^\s]*[[:blank:]]?\(\\(?2:[^\n]+\\)"
+  (concat "^(?\\(?1:[^ ]*\\).*[[:blank:]]?\(\\(?2:[^\n]+\\)"
           "\s\\(?3:[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\)"
           "\s\\(?4:[0-9]\\{2\\}:[0-9]\\{2\\}:[0-9]\\{2\\}\\)")
 
@@ -48,16 +52,16 @@
 (defconst blamer--commit-message-regexp "\n\n[\s]+\\(?1:[^\']+\\):?"
   "Regexp for commit message parsing.")
 
-(defconst blamer--git-author-cmd "git config --get user.name"
-  "Command for getting current git user name.")
+(defconst blamer--git-author-cmd '("config" "--get" "user.name")
+  "Command for getting current git user name via `vc-git'.")
 
-(defconst blamer--git-repo-cmd "git rev-parse --is-inside-work-tree"
+(defconst blamer--git-repo-cmd '("rev-parse" "--is-inside-work-tree")
   "Command for detect git repo.")
 
-(defconst blamer--git-blame-cmd "git blame -L %s,%s %s"
+(defconst blamer--git-blame-cmd '("blame"  "-L")
   "Command for get blame of current line.")
 
-(defconst blamer--git-commit-message "git log -n1 %s"
+(defconst blamer--git-commit-message '("log"  "-n1")
   "Command for get commit message.")
 
 (defconst blamer--current-time-text "Now"
@@ -103,20 +107,20 @@
   :type 'boolean)
 
 (defcustom blamer-offset-per-symbol nil
-  "Its a crutch :< for font less then original editor font. Use carefully.
+  "Its a crutch :< for font less then original editor font.  Use carefully.
 Will add additional space for each BLAMER-OFFSET-PER-SYMBOL"
   :group 'blamer
   :type 'integer)
 
 (defcustom blamer-type 'both
   "Type of blamer.
-'visual - show blame only for current line
-'selected - show blame only for selected line
-'both - both of them
+\\=visual - show blame only for current line
+\\=selected - show blame only for selected line
+\\=both - both of them
 
 This types are used only for single line blame.
-'overlay-popup - show commit info inside pretty overlay
-'posframe-popup - show commit info inside pretty posframe window"
+\\=overlay-popup - show commit info inside pretty overlay
+\\=posframe-popup - show commit info inside pretty posframe window"
   :group 'blamer
   :type '(choice (const :tag "Visual only" visual)
                  (const :tag "Pretty overlay popup" overlay-popup)
@@ -146,10 +150,10 @@ place to paste popup."
   :type 'integer)
 
 (defcustom blamer-border-lines '(?╭ ?─ ?╮ ?│ ?╯ ?╰ )
-  "List of lines and borders. When value is nil, borders will not preset.
+  "List of lines and borders.  When value is nil, borders will not preset.
 Be careful! This config highly coupled with your current face!
 
-Alternative preset: '(?┌ ?─ ?┐ ?│ ?┘ ?└)"
+Alternative preset: \\=(?┌ ?─ ?┐ ?│ ?┘ ?└)"
   :group 'blamer
   :type 'alist)
 
@@ -167,7 +171,7 @@ length."
   :type 'string)
 
 (defcustom blamer-view 'overlay
-  "View for commit message. Can be 'overlay and 'overlay-right."
+  "View for commit message.  Can be \\=overlay and \\=overlay-right."
   :group 'blamer
   :type '(choice (const :tag "Overlay right" overlay-right)
                  (const :tag "Overlay" overlay)))
@@ -183,14 +187,56 @@ If not will use background from `blamer-face'"
   :group 'blamer
   :type 'boolean)
 
+(defcustom blamer-show-avatar-p t
+  "Show avatar in popup.
+This feature required Emacs built with `imagemagick'"
+  :group 'blamer
+  :type 'boolean)
+
+(defcustom blamer-avatar-size 96
+  "Size of avatar."
+  :group 'blamer
+  :type 'int)
+
+(defcustom blamer-avatar-ratio '(3 . 3)
+  "Image ration for avatar."
+  :group 'blamer
+  :type 'cons)
+
+(defcustom blamer-avatar-cache-time 604800
+  "Time in seconds to cache avatar.  Default value is 1 week."
+  :group 'blamer
+  :type 'int)
+
+(defcustom blamer-avatar-folder "~/.blamer/avatars/"
+  "Folder for avatars."
+  :group 'blamer
+  :type 'string)
+
+(defcustom blamer-avatar-regexps-uploaders-alist
+  '(("github" . ("https://api.github.com/search/users" blamer--github-avatar-uploader))
+    ("gitlab" . ("https://gitlab.com" blamer--gitlab-avatar-uploader)))
+  "List of regexps for uploaders.
+Each element is a cons cell (REGEXP . FUNCTION)."
+  :group 'blamer
+  :type 'list)
+
+(defcustom blamer-fallback-avatar-config
+  '("http://www.gravatar.com/avatar" blamer--fallback-avatar-uploader)
+  "Fallback avatar config."
+  :group 'blamer
+  :type 'list)
+
+
 (defcustom blamer-posframe-configurations
-  '(:left-fringe 8
-    :right-fringe 8
-    :y-pixel-offset 20
-    :x-pixel-offset -20
-    :internal-border-width 2
-    :lines-truncate t
-    :accept-focus nil)
+  '(:left-fringe 16
+                 :right-fringe 16
+                 :y-pixel-offset 20
+                 :x-pixel-offset -20
+                 :internal-border-width 1
+                 :internal-border-color "#61AFEF"
+                 :lines-truncate t
+                 :accept-focus nil)
   "Plist of configurations for `posframe-show' method."
   :group 'blamer
   :type 'plist)
@@ -244,8 +290,8 @@ Callback function applying plist argument:
 :commit-author - author name after formatting
 :raw-commit-author - raw author username if exist.
 :commit-date - date of commit. (string field)
-:commit-time - commit's time. (string field)
-:commit-message - message of commit. If not exist will be get from
+:commit-time - commit time. (string field)
+:commit-message - message of commit.  If not exist will be get from
 `blamer-uncommitted-changes-message' variable.
 :raw-commit-message - Full message of commit.
 
@@ -253,7 +299,7 @@ For example you can pass such bindings for message
 author name by left click and copying commit hash by right click.
 \(without backslash)
 
-'((<mapvar> . (lambda (commit-info) (message (plist-get :commit-author))))
+\\=((<mapvar> . (lambda (commit-info) (message (plist-get :commit-author))))
   (<mapvar> . (lambda (commit-info) (kill-new (plist-get :commit-hash)))))"
   :group 'blamer
   :type 'alist)
@@ -316,7 +362,7 @@ Will show the available `blamer-bindings'."
 (defun blamer--git-exist-p ()
   "Return t if .git exist."
   (when-let* ((file-name (blamer--get-local-name (buffer-file-name)))
-              (git-exist-stdout (shell-command-to-string blamer--git-repo-cmd)))
+              (git-exist-stdout (apply #'vc-git--run-command-string nil blamer--git-repo-cmd)))
     (string-match "^true" git-exist-stdout)))
 
 (defun blamer--clear-overlay ()
@@ -327,17 +373,16 @@ Will show the available `blamer-bindings'."
 
 (defun blamer--git-cmd-error-p (cmd-res)
   "Return t if CMD-RES contain error."
-  (string-match-p  "^fatal:" cmd-res))
+  (or (not cmd-res) (string-match-p  "^fatal:" cmd-res)))
 
 (defun blamer--truncate-time (time)
   "Remove seconds from TIME string."
   (string-join (butlast (split-string time ":")) ":"))
 
+;; TODO: pass argument for pretty format to vc-git--run-command-string
 (defun blamer--prettify-time (date time)
   "Prettify DATE and TIME for nice commit message."
-  (let* ((parsed-time (decoded-time-set-defaults (parse-time-string (concat date "T" time))))
-         (now (decode-time (current-time)))
-         (seconds-ago (float-time (time-since (concat date "T" time))))
+  (let* ((seconds-ago (float-time (time-since (concat date "T" time))))
          (minutes-ago (if (eq seconds-ago 0) 0 (floor (/ seconds-ago 60))))
          (hours-ago (if (eq minutes-ago 0) 0 (floor (/ minutes-ago 60))))
          (days-ago (if (eq hours-ago 0) 0 (floor (/ hours-ago 24))))
@@ -345,7 +390,7 @@ Will show the available `blamer-bindings'."
          (months-ago (if (eq days-ago 0) 0 (floor (/ days-ago 30))))
          (years-ago (if (eq months-ago 0) 0 (floor (/ months-ago 12)))))
 
-    (cond ((or (time-equal-p now parsed-time) (< seconds-ago 60)) blamer--current-time-text)
+    (cond ((<= seconds-ago 60) blamer--current-time-text)
           ((< minutes-ago 60) (format "%s minutes ago" minutes-ago))
           ((= hours-ago 1) (format "Hour ago"))
           ((< hours-ago 24) (format "%s hours ago" hours-ago))
@@ -457,7 +502,7 @@ COMMIT-INFO - all the commit information, for `blamer--apply-bindings'"
 (defun blamer--get-commit-messages (hash)
   "Get commit message by provided HASH.
 Return nil if error."
-  (let* ((git-commit-res (shell-command-to-string (format blamer--git-commit-message hash)))
+  (let* ((git-commit-res (apply #'vc-git--run-command-string nil (append blamer--git-commit-message (list hash))))
          (has-error (or (blamer--git-cmd-error-p git-commit-res) (eq (length git-commit-res) 0)))
          commit-message)
     (unless has-error
@@ -465,17 +510,22 @@ Return nil if error."
       (setq commit-message (match-string 1 git-commit-res))
       (split-string commit-message "\n"))))
 
-(defun blamer--parse-line-info (blame-msg)
-  "Parse BLAME-MSG and create a plist."
+(defun blamer--parse-line-info (blame-msg &optional include-avatar-p)
+  "Parse BLAME-MSG and create a plist.
+
+When INCLUDE-AVATAR-P provided and non-nil,
+avatar will be downloaded and included in the plist."
   (string-match blamer--regexp-info blame-msg)
-  (let* ((commit-hash (match-string 1 blame-msg))
+  (let* ((commit-hash (string-trim (match-string 1 blame-msg)))
          (raw-commit-author (match-string 2 blame-msg))
+         (uncommitted (string= raw-commit-author "Not Committed Yet"))
          (commit-author (if (and (string= raw-commit-author blamer--current-author) blamer-self-author-name)
                             blamer-self-author-name
                           raw-commit-author))
          (commit-date (match-string 3 blame-msg))
          (commit-time (match-string 4 blame-msg))
          (commit-messages (blamer--get-commit-messages commit-hash))
+         (author-email (vc-git--run-command-string nil "log" "-n1" "--pretty=format:%ae" commit-hash))
          (commit-message (car commit-messages))
          (commit-message (when commit-message (string-trim commit-message)))
          (commit-message (when (and blamer-commit-formatter commit-message)
@@ -484,16 +534,121 @@ Return nil if error."
                             blamer-max-commit-message-length nil nil "...")))
          (commit-description (cdr commit-messages))
          (raw-commit-message (nth 1 commit-messages))
+         (avatar (when (and
+                        blamer-show-avatar-p
+                        include-avatar-p
+                        (not uncommitted)
+                        (display-graphic-p))
+                   (blamer--get-avatar author-email)))
          (parsed-commit-info `(:commit-hash ,commit-hash
-                               :commit-author ,commit-author
-                               :commit-date ,commit-date
-                               :commit-time ,commit-time
-                               :raw-commit-author ,raw-commit-author
-                               :commit-message ,commit-message
-                               :commit-description ,commit-description
-                               :raw-commit-message ,raw-commit-message)))
+                                            :author-email ,author-email
+                                            :commit-author ,commit-author
+                                            :commit-date ,commit-date
+                                            :commit-time ,commit-time
+                                            :commit-avatar ,avatar
+                                            :raw-commit-author ,raw-commit-author
+                                            :commit-message ,commit-message
+                                            :commit-description ,commit-description
+                                            :raw-commit-message ,raw-commit-message)))
 
     parsed-commit-info))
+
+(defun blamer--github-avatar-uploader (remote-url file-path author-email)
+  "Download the author avatar from REMOTE-URL using the AUTHOR-EMAIL to FILE-PATH."
+  (let* ((url (concat remote-url "?q=" author-email))
+         (response (url-retrieve-synchronously url))
+         (response-data (with-current-buffer response
+                          (goto-char (point-min))
+                          (search-forward "\n\n")
+                          (json-read)))
+         (items (cdr (assoc 'items response-data)))
+         (first-item (and (> (length items) 0) (elt items 0)))
+         (avatar-url (and first-item (cdr (assoc 'avatar_url first-item)))))
+
+    (if avatar-url
+        (blamer--upload-avatar avatar-url file-path)
+      (funcall (cadr blamer-fallback-avatar-config)
+               (car blamer-fallback-avatar-config)
+               file-path author-email))))
+
+
+(defun blamer--gitlab-avatar-url (author-email)
+  "Get the avatar URL for the email address AUTHOR-EMAIL on GitLab."
+  (let ((url (format "https://gitlab.com/api/v4/avatar?email=%s" author-email)))
+    (with-current-buffer (url-retrieve-synchronously url)
+      (goto-char (point-min))
+      (let ((json-object-type 'hash-table))
+        (let ((json-data (json-read)))
+          (gethash "avatar_url" json-data))))))
+
+(defun blamer--fallback-avatar-uploader (remote-url file-path author-email)
+  "Fallback function for upload avatars and save it.
+FILE-PATH - path to save avatar.
+AUTHOR-EMAIL - email of author.
+REMOTE-URL - url of resource to download avatar."
+  (blamer--upload-avatar (format "%s/%s?d=identicon" remote-url (md5 author-email)) file-path))
+
+(defun blamer--gitlab-avatar-uploader (remote-url file-path author-email)
+  "Upload avatar from REMOTE-URL for gitlab using AUTHOR-EMAIL to FILE-PATH."
+  (when-let ((url (format "%s/api/v4/avatar?email=%s" remote-url author-email))
+             (response (url-retrieve-synchronously url))
+             (json-string (with-current-buffer response
+                            (buffer-substring (point) (point-max))))
+             (json-object-type 'hash-table)
+             (json-data (json-read-from-string json-string))
+             (avatar-url (gethash "avatar_url" json-data)))
+    (blamer--upload-avatar avatar-url file-path)))
+
+(defun blamer--upload-avatar (url file-path)
+  "Download the avatar from URL and save it to the path as FILE-PATH.
+HOST-NAME is the name of the host for caching.
+host folder.
+If the file already exists, return the path to the existing file."
+  (unless (file-exists-p (file-name-directory file-path))
+    (make-directory (file-name-directory file-path) t))
+  (url-copy-file url file-path t)
+  file-path)
+
+
+(defun blamer--find-avatar-uploader (remote-ref)
+  "Find the avatar uploader function and REMOTE-REF that match the provided STRING.
+
+The uploader functions and URLs are defined in
+`blamer-avatar-regexps-uploaders-alist`."
+  (let ((uploader-pair (assoc-default remote-ref blamer-avatar-regexps-uploaders-alist 'string-match)))
+    (if uploader-pair
+        uploader-pair
+      blamer-fallback-avatar-config)))
+
+(defun blamer--get-avatar (author-email)
+  "Get avatar url for AUTHOR or AUTHOR-EMAIL.
+Function return current path for avatar url.
+Works only for github right now."
+  (when-let* ((remote-ref (vc-git--run-command-string nil "ls-remote" "--get-url" "origin"))
+              (uploader-fn-path (blamer--find-avatar-uploader remote-ref))
+              (uploader-path (car uploader-fn-path))
+              (uploader-fn (car (cdr uploader-fn-path)))
+              (host-name (when (string-match "https?://\\(?1:.*\\)/?" uploader-path)
+                           (match-string 1 uploader-path)))
+              (host-name (car (split-string host-name "/")))
+              (folder (concat (file-name-as-directory blamer-avatar-folder)
+                              (file-name-as-directory host-name)))
+              (filename (format "%s.png" author-email))
+              (file-path (concat folder filename)))
+
+    (if (and (file-exists-p file-path)
+             (not (blamer--cache-outdated-p file-path)))
+        file-path
+      (funcall uploader-fn uploader-path file-path author-email))))
+
+(defun blamer--cache-outdated-p (file-path)
+  "Check if the cache for FILE-PATH is outdated."
+  (let* ((attributes (file-attributes file-path))
+         (creation-time (nth 5 attributes))
+         (current-time (current-time)))
+
+    (> (time-to-seconds (time-subtract current-time creation-time))
+       blamer-avatar-cache-time)))
 
 (defun blamer--get-available-width-before-window-end ()
   "Return count of chars before window end."
@@ -522,7 +677,7 @@ Return nil if error."
                                                     commit-info))
          (popup-message (blamer--maybe-normalize-truncated-line popup-message)))
 
-    (when (and commit-author (not (eq commit-author "")))
+    (when (and commit-author (not (string= commit-author "")))
       popup-message)))
 
 (defun blamer--get-background-color ()
@@ -557,9 +712,9 @@ Return nil if error."
   (let ((map (make-sparse-keymap)))
     (dolist (mapbind blamer-bindings)
       (define-key map (kbd (car mapbind))
-        (lambda ()
-          (interactive)
-          (funcall (cdr mapbind) commit-info))))
+                  (lambda ()
+                    (interactive)
+                    (funcall (cdr mapbind) commit-info))))
     (setq text (propertize text 'keymap map)))
   text)
 
@@ -624,7 +779,6 @@ Return cons of result and count of lines."
 
     res))
 
-
 (defun blamer--create-popup-text-content (commit-info)
   "Create the content of the popup from COMMIT-INFO.
 Return list of strings."
@@ -637,19 +791,17 @@ Return list of strings."
                      ,(concat (blamer--prettify-keyword "date:   ")
                               (blamer--prettify-meta-data
                                (concat (plist-get commit-info :commit-date) " " (plist-get commit-info :commit-time))))
-                     ,(blamer--prettify-border " ")
-                     ,(blamer--prettify-commit-message (or (plist-get commit-info :commit-message) "")))))
+                     ,(blamer--prettify-border " "))))
     msg-list))
 
 
 (defun blamer--render-overlay-popup (commit-info)
   "Render COMMIT-INFO as pretty overlay with border."
-  (let* (
-         (msg-list (blamer--create-popup-text-content commit-info))
+  (let* ((msg-list (blamer--create-popup-text-content commit-info))
          (commit-descriptions (mapcar #'blamer--prettify-commit-message (plist-get commit-info :commit-description)))
-         (msg-lines (append msg-list commit-descriptions))
+         (commit-message (blamer--prettify-commit-message (or (plist-get commit-info :commit-message) "")))
+         (msg-lines (append msg-list (list commit-message) commit-descriptions))
          (msg (blamer--format-pretty-tooltip msg-lines))
-
          (beg (save-excursion (beginning-of-line) (point)))
          (ov (save-excursion (move-end-of-line nil)
                              (make-overlay beg (point) nil t t))))
@@ -673,16 +825,52 @@ Return list of strings."
     (overlay-put ov 'window (get-buffer-window))
     (add-to-list 'blamer--overlays ov)))
 
+
+(defun blamer--build-pretty-content (commit-info)
+  "Build pretty content inside separated buffer from COMMIT-INFO."
+  (let* ((msg-list (blamer--create-popup-text-content commit-info))
+         (commit-avatar (plist-get commit-info :commit-avatar))
+         (insert-avatar-p (and blamer-show-avatar-p
+                               (image-type-available-p 'imagemagick)
+                               commit-avatar))
+         (commit-message (or (plist-get commit-info :commit-message) ""))
+         ;; TODO: find better way to calculate image size for pretty paddings between commit info
+         ;; (hw (* (frame-char-width) blamer-avatar-size))
+         (commit-info-prefix (if insert-avatar-p "  " "")))
+    (save-excursion
+      (with-current-buffer (get-buffer-create blamer--buffer-name)
+        (erase-buffer)
+        (insert "\n")
+        (when (and (image-type-available-p 'imagemagick) insert-avatar-p)
+          (insert-sliced-image
+           (create-image commit-avatar 'imagemagick nil :height blamer-avatar-size :width blamer-avatar-size)
+           nil nil (car blamer-avatar-ratio) (cdr blamer-avatar-ratio)))
+        (goto-char (point-min))
+        (forward-line 1)
+
+        (dolist (m msg-list)
+          (end-of-line)
+          (insert (concat commit-info-prefix m))
+          (unless insert-avatar-p (insert "\n"))
+          (forward-line 1))
+        (when (and commit-message (not (string= commit-message "")))
+          (when insert-avatar-p (insert "\n"))
+          (insert (blamer--prettify-commit-message (or (plist-get commit-info :commit-message) "")))
+          (insert "\n"))
+
+        (insert (string-join (mapcar #'blamer--prettify-commit-message (plist-get commit-info :commit-description)) "\n"))
+        (insert "\n")))
+    (with-current-buffer (get-buffer-create blamer--buffer-name) (buffer-string))))
+
 (defun blamer--render-posframe-popup (commit-info)
   "Render COMMIT-INFO as posframe popup."
   (when (and (fboundp 'posframe-workable-p) (posframe-workable-p))
-    (let ((msg-list (blamer--create-popup-text-content commit-info)))
+    (let ((pretty-content (blamer--build-pretty-content commit-info)))
       (apply 'posframe-show
              (append `(,blamer--buffer-name)
                      (blamer--plist-merge
                       blamer-posframe-configurations
-                      `(:string ,(concat (string-join msg-list "\n")
-                                         (string-join (mapcar #'blamer--prettify-commit-message (plist-get commit-info :commit-description)) "\n")))))))))
+                      `(:string , pretty-content)))))))
 
 (defun blamer--render-line-overlay (commit-info &optional type)
   "Render COMMIT-INFO overlay by optional TYPE.
@@ -710,8 +898,11 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
                                   (line-number-at-pos)))
              (file-name (blamer--get-local-name (buffer-file-name)))
              (file-name (when file-name (replace-regexp-in-string " " "\\\\\  " file-name)))
-             (cmd (format blamer--git-blame-cmd start-line-number end-line-number file-name))
-             (blame-cmd-res (when file-name (shell-command-to-string cmd)))
+             (include-avatar-p (member type '(posframe-popup overlay-popup)))
+             (blame-cmd-res (when file-name
+                              (apply #'vc-git--run-command-string file-name
+                                     (append blamer--git-blame-cmd
+                                             (list (format "%s,%s" start-line-number end-line-number))))))
              (blame-cmd-res (when blame-cmd-res (butlast (split-string blame-cmd-res "\n")))))
 
         (blamer--clear-overlay)
@@ -722,7 +913,7 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
 
           (dolist (cmd-msg blame-cmd-res)
             (unless (blamer--git-cmd-error-p cmd-msg)
-              (let ((commit-info (blamer--parse-line-info cmd-msg)))
+              (let ((commit-info (blamer--parse-line-info cmd-msg include-avatar-p)))
                 (blamer--render-line-overlay commit-info type)
                 (forward-line)))))))))
 
@@ -804,7 +995,7 @@ argument disables it.  From Lisp, argument omitted or nil enables
 the mode, `toggle' toggles the state.
 
 When `blamer-mode' is enabled, the popup message with commit info
-will appear after BLAMER-IDLE-TIME. It works only inside git repo"
+will appear after BLAMER-IDLE-TIME.  It works only inside git repo"
   :init-value nil
   :global nil
   :lighter nil
@@ -813,12 +1004,11 @@ will appear after BLAMER-IDLE-TIME. It works only inside git repo"
               blamer-commit-formatter
               blamer-datetime-formatter)
     (message "Your have to provide at least one formatter for blamer.el"))
-
   (let ((is-git-repo (blamer--git-exist-p)))
     (when (and (not blamer--current-author)
                blamer-author-formatter
                is-git-repo)
-      (setq-local blamer--current-author (replace-regexp-in-string "\n\\'" "" (shell-command-to-string blamer--git-author-cmd))))
+      (setq-local blamer--current-author (replace-regexp-in-string "\n\\'" "" (apply #'vc-git--run-command-string nil blamer--git-author-cmd))))
     (if (and blamer-mode (buffer-file-name) is-git-repo)
         (progn
           (add-hook 'post-command-hook #'blamer--try-render nil t)
