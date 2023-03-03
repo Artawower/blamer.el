@@ -361,9 +361,8 @@ Will show the available `blamer-bindings'."
 
 (defun blamer--git-exist-p ()
   "Return t if .git exist."
-  (when-let* ((file-name (blamer--get-local-name (buffer-file-name)))
-              (git-exist-stdout (apply #'vc-git--run-command-string nil blamer--git-repo-cmd)))
-    (string-match "^true" git-exist-stdout)))
+  (when-let* ((file-name (blamer--get-local-name (buffer-file-name))))
+    (vc-backend file-name)))
 
 (defun blamer--clear-overlay ()
   "Clear last overlay."
@@ -1043,6 +1042,9 @@ will appear after BLAMER-IDLE-TIME.  It works only inside git repo"
 
 TYPE - optional parameter, by default will use `overlay-popup'."
   (interactive)
+  (unless (blamer--git-exist-p)
+    (message "Not inside git repo"))
+
   (when (blamer--git-exist-p)
     (blamer--reset-state)
     (blamer--render (or type 'overlay-popup))
