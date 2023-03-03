@@ -1008,11 +1008,12 @@ will appear after BLAMER-IDLE-TIME.  It works only inside git repo"
                blamer-author-formatter
                is-git-repo)
       (setq-local blamer--current-author (replace-regexp-in-string "\n\\'" "" (apply #'vc-git--run-command-string nil blamer--git-author-cmd))))
-    (if (and blamer-mode (buffer-file-name) is-git-repo)
-        (progn
-          (add-hook 'post-command-hook #'blamer--try-render nil t)
-          (add-hook 'window-state-change-hook #'blamer--try-render nil t))
-      (blamer--reset-state))))
+    (when (and (buffer-file-name) is-git-repo)
+      (if blamer-mode
+          (progn
+            (add-hook 'post-command-hook #'blamer--try-render nil t)
+            (add-hook 'window-state-change-hook #'blamer--try-render nil t))
+        (blamer--reset-state)))))
 
 ;;;###autoload
 (define-globalized-minor-mode
