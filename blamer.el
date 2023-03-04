@@ -362,10 +362,12 @@ Will show the available `blamer-bindings'."
 (defun blamer--git-exist-p ()
   "Return t if .git exist."
   (when-let* ((file-name (blamer--get-local-name (buffer-file-name))))
+    (message "[blamer] vc backend: %s" (vc-backend file-name))
     (vc-backend file-name)))
 
 (defun blamer--clear-overlay ()
   "Clear last overlay."
+  (message "[Blamer] clear overlay")
   (dolist (ov blamer--overlays)
     (delete-overlay ov))
   (setq blamer--overlays '()))
@@ -815,9 +817,13 @@ Return list of strings."
 
 (defun blamer--render-right-overlay (commit-info)
   "Render COMMIT-INFO as overlay at right position."
+  (message "[blamer] render right overlay")
   (when-let ((ov (progn (move-end-of-line nil)
                         (make-overlay (point) (point) nil t t)))
              (popup-msg (blamer--create-popup-msg commit-info)))
+
+    (message "[blamer] right overlay popup message %s" popup-msg)
+    (message "------------------------------")
 
     (overlay-put ov 'after-string popup-msg)
     (overlay-put ov 'intangible t)
@@ -882,6 +888,7 @@ when not provided `blamer-type' will be used."
   "Render text about current line commit status.
 TYPE - is optional argument that can replace global `blamer-type' variable."
 
+  (message "[blamer] blamer render type: %s" type)
   (with-current-buffer (window-buffer (get-buffer-window))
     (save-restriction
       (widen)
@@ -904,6 +911,7 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
                                              (list (format "%s,%s" start-line-number end-line-number))))))
              (blame-cmd-res (when blame-cmd-res (butlast (split-string blame-cmd-res "\n")))))
 
+        (message "[blamer] blame-cmd-res: %s" blame-cmd-res)
         (blamer--clear-overlay)
 
         (save-excursion
@@ -919,6 +927,7 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
 (defun blamer--safety-render (&optional type)
   "Function for checking current active blamer type before rendering with delay.
 Optional TYPE argument will override global `blamer-type'."
+  (message "[blamer] start safety render")
   (let ((blamer-type (or type blamer-type)))
     (unless (or (and (or (eq blamer-type 'overlay-popup)
                          (eq blamer-type 'visual))
@@ -929,8 +938,10 @@ Optional TYPE argument will override global `blamer-type'."
 (defun blamer--render-commit-info-with-delay ()
   "Render commit info with delay."
   (when blamer-idle-timer
+    (message "[blamer] cancel previous timer")
     (cancel-timer blamer-idle-timer))
 
+  (message "[blamer] start new timer with delay: %s" (or blamer-idle-time 0))
   (setq blamer-idle-timer
         (run-with-idle-timer (or blamer-idle-time 0) nil 'blamer--safety-render)))
 
@@ -1008,11 +1019,14 @@ will appear after BLAMER-IDLE-TIME.  It works only inside git repo"
                blamer-author-formatter
                is-git-repo)
       (setq-local blamer--current-author (replace-regexp-in-string "\n\\'" "" (apply #'vc-git--run-command-string nil blamer--git-author-cmd))))
+
     (when (and (buffer-file-name) is-git-repo)
       (if blamer-mode
           (progn
+            (message "[blamer] activated for buffer: %s" (buffer-file-name))
             (add-hook 'post-command-hook #'blamer--try-render nil t)
             (add-hook 'window-state-change-hook #'blamer--try-render nil t))
+        (message "[blamer] Reset state.")
         (blamer--reset-state)))))
 
 ;;;###autoload
