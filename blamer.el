@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (posframe "1.1.7"))
-;; Version: 0.6.1
+;; Version: 0.6.2
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -896,7 +896,6 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
                                       (line-number-at-pos))
                                   (line-number-at-pos)))
              (file-name (blamer--get-local-name (buffer-file-name)))
-             (file-name (when file-name (replace-regexp-in-string " " "\\\\\  " file-name)))
              (include-avatar-p (member type '(posframe-popup overlay-popup)))
              (blame-cmd-res (when file-name
                               (apply #'vc-git--run-command-string file-name
