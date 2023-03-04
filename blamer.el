@@ -903,7 +903,7 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
                                       (line-number-at-pos))
                                   (line-number-at-pos)))
              (file-name (blamer--get-local-name (buffer-file-name)))
-             (file-name (when file-name (replace-regexp-in-string " " "\\\\\  " file-name)))
+             ;; (file-name (when file-name (replace-regexp-in-string " " "\\\\\  " file-name)))
              (include-avatar-p (member type '(posframe-popup overlay-popup)))
              (blame-cmd-res (when file-name
                               (apply #'vc-git--run-command-string file-name
@@ -911,7 +911,15 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
                                              (list (format "%s,%s" start-line-number end-line-number))))))
              (blame-cmd-res (when blame-cmd-res (butlast (split-string blame-cmd-res "\n")))))
 
+        (message "[blamer] file-name: %s" file-name)
+        (message "[blamer] formatted file-path: %s" (when file-name (replace-regexp-in-string " " "\\\\\  " file-name)))
+        (message "[blamer] start/end lines %s/%s" start-line-number end-line-number)
         (message "[blamer] blame-cmd-res: %s" blame-cmd-res)
+        (message "[blamer] hey, try eval this code manually: \n%s"
+                 (format "(apply #'vc-git--run-command-string \"%s\"
+                                     (append blamer--git-blame-cmd
+                                             (list \"%s,%s\")))"
+                         file-name start-line-number end-line-number))
         (blamer--clear-overlay)
 
         (save-excursion
