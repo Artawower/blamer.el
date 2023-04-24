@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (posframe "1.1.7"))
-;; Version: 0.6.2
+;; Version: 0.7.0
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -635,6 +635,7 @@ Works only for github right now."
               (filename (format "%s.png" author-email))
               (file-path (concat folder filename)))
 
+
     (if (and (file-exists-p file-path)
              (not (blamer--cache-outdated-p file-path)))
         file-path
@@ -918,10 +919,12 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
 (defun blamer--safety-render (&optional type)
   "Function for checking current active blamer type before rendering with delay.
 Optional TYPE argument will override global `blamer-type'."
-  (let ((blamer-type (or type blamer-type)))
+  (let ((blamer-type (or type blamer-type))
+        (long-region-p (blamer--long-region-p)))
     (unless (or (and (or (eq blamer-type 'overlay-popup)
                          (eq blamer-type 'visual))
                      (use-region-p))
+                long-region-p
                 blamer--block-render-p)
       (blamer--render blamer-type))))
 
@@ -941,20 +944,24 @@ Optional TYPE argument will override global `blamer-type'."
   (setq blamer--previous-point (point))
   (setq blamer--previous-region-active-p (region-active-p)))
 
+(defun blamer--long-region-p ()
+  "Return t when region is so big for rendering."
+  (and (region-active-p)
+       (> (count-lines (region-beginning) (region-end)) blamer-max-lines)))
+
 (defun blamer--try-render (&optional local-type)
   "Render current line if is .git exist.
 LOCAL-TYPE is force replacement of current `blamer-type' for handle rendering."
 
-  (let* ((long-line-p (and (region-active-p)
-                           (> (count-lines (region-beginning) (region-end)) blamer-max-lines)))
+  (let* ((long-region-p (blamer--long-region-p))
          (region-deselected-p (and blamer--previous-region-active-p (not (region-active-p))))
-         (clear-overlays-p (or long-line-p region-deselected-p))
+         (clear-overlays-p (or long-region-p region-deselected-p))
          (type (or local-type blamer-type)))
 
     (when (and clear-overlays-p (not blamer--block-render-p))
       (blamer--clear-overlay))
 
-    (when (and (not long-line-p)
+    (when (and (not long-region-p)
                (not blamer--block-render-p)
                (or (eq type 'both)
                    (and (eq type 'visual) (not (use-region-p)))
@@ -966,8 +973,9 @@ LOCAL-TYPE is force replacement of current `blamer-type' for handle rendering."
                    (not (eq blamer--previous-line-length (length (thing-at-point 'line))))))
 
       (blamer--clear-overlay)
-      (blamer--preserve-state)
-      (blamer--render-commit-info-with-delay))))
+      (blamer--render-commit-info-with-delay))
+
+    (blamer--preserve-state)))
 
 (defun blamer--reset-state ()
   "Reset all state after blamer mode is disabled."
