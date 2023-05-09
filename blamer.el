@@ -993,10 +993,9 @@ LOCAL-TYPE is force replacement of current `blamer-type' for handle rendering."
   (remove-hook 'window-state-change-hook #'blamer--try-render t))
 
 (defun blamer--get-user-name ()
-  "Query git config for user name"
-  (let ((command-output (apply #'vc-git--run-command-string nil blamer--git-author-cmd)))
-    (if command-output
-        (replace-regexp-in-string "\n\\'" "" command-output))))
+  "Query git config for user name."
+  (when-let ((command-output (apply #'vc-git--run-command-string nil blamer--git-author-cmd)))
+    (replace-regexp-in-string "\n\\'" "" command-output)))
 
 ;;;###autoload
 (define-minor-mode blamer-mode
