@@ -992,6 +992,11 @@ LOCAL-TYPE is force replacement of current `blamer-type' for handle rendering."
   (remove-hook 'post-command-hook #'blamer--try-render t)
   (remove-hook 'window-state-change-hook #'blamer--try-render t))
 
+(defun blamer--get-user-name ()
+  "Query git config for user name."
+  (when-let ((command-output (apply #'vc-git--run-command-string nil blamer--git-author-cmd)))
+    (replace-regexp-in-string "\n\\'" "" command-output)))
+
 ;;;###autoload
 (define-minor-mode blamer-mode
   "Blamer mode.
@@ -1014,7 +1019,7 @@ will appear after BLAMER-IDLE-TIME.  It works only inside git repo"
     (when (and (not blamer--current-author)
                blamer-author-formatter
                is-git-repo)
-      (setq-local blamer--current-author (replace-regexp-in-string "\n\\'" "" (apply #'vc-git--run-command-string nil blamer--git-author-cmd))))
+      (setq-local blamer--current-author (blamer--get-user-name)))
     (when (and (buffer-file-name) is-git-repo)
       (if blamer-mode
           (progn
