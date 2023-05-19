@@ -6,9 +6,13 @@
 
 (ert-deftest test-parse-regexp ()
   "Test blame parser regexp."
-  (let* ((blame-msg-1 "(44307898 (artawower 2021-10-16 14:06:06 +0300 241)          commit-message")
-         (blame-msg-2 "(b3a30c6ae (Andrey Tokarev 2020-12-16 16:28:09 +0800 4) $tooltip-border-radius: 2px;)")
-         (blame-msg-3 "(^3130q6ze (@s!~range$><name-+\/ 2020-12-16 16:28:09 +0800 4) $tooltip-border-radius: 2px;)"))
+  (let* ((blame-msg-1 "44307898 (artawower 2021-10-16 14:06:06 +0300 241)          commit-message")
+         (blame-msg-2 "b3a30c6ae (Andrey Tokarev 2020-12-16 16:28:09 +0800 4) $tooltip-border-radius: 2px;")
+         (blame-msg-3 "^3130q6ze (@s!~range$><name-+\/ 2020-12-16 16:28:09 +0800 4) $tooltip-border-radius: 2px;")
+         (blame-msg-4 "^3130q6ze (Tom Bombadil (he/him) 2020-12-16 16:28:09 +0800 4) $tooltip-border-radius: 2px;")
+         (blame-msg-5 "^3130q6ze (TomBombadil(he/him) 2020-12-16 16:28:09 +0800 4) $tooltip-border-radius: 2px;")
+         (blame-msg-6 "3b90f8b82 lib/project_web/live/installation_live/show.html.heex (TomBombadil(he/him) 2023-03-16 08:08:26 -0500 25)     <div class=\"flex justify-between gap-4\">"))
+
     (string-match blamer--regexp-info blame-msg-1)
     (should (equal (match-string 1 blame-msg-1) "44307898"))
     (should (equal (match-string 2 blame-msg-1) "artawower"))
@@ -26,7 +30,22 @@
     (should (equal (match-string 1 blame-msg-3) "^3130q6ze"))
     (should (equal (match-string 2 blame-msg-3) "@s!~range$><name-+\/"))
     (should (equal (match-string 3 blame-msg-3) "2020-12-16"))
-    (should (equal (match-string 4 blame-msg-3) "16:28:09"))))
+    (should (equal (match-string 4 blame-msg-3) "16:28:09"))
+
+    (string-match blamer--regexp-info blame-msg-4)
+    (should (equal (match-string 1 blame-msg-4) "^3130q6ze"))
+    (should (equal (match-string 2 blame-msg-4) "Tom Bombadil (he/him)"))
+    (should (equal (match-string 3 blame-msg-4) "2020-12-16"))
+    (should (equal (match-string 4 blame-msg-4) "16:28:09"))
+
+    (string-match blamer--regexp-info blame-msg-5)
+    (should (equal (match-string 1 blame-msg-5) "^3130q6ze"))
+    (should (equal (match-string 2 blame-msg-5) "TomBombadil(he/him)"))
+    (should (equal (match-string 3 blame-msg-5) "2020-12-16"))
+    (should (equal (match-string 4 blame-msg-5) "16:28:09"))
+
+    (string-match blamer--regexp-info blame-msg-6)
+    (should (equal (match-string 2 blame-msg-6) "TomBombadil(he/him)"))))
 
 
 
