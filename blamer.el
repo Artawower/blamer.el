@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (posframe "1.1.7"))
-;; Version: 0.7.2
+;; Version: 0.7.3
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -222,7 +222,7 @@ Each element is a cons cell (REGEXP . FUNCTION)."
   :type 'list)
 
 (defcustom blamer-fallback-avatar-config
-  '("http://www.gravatar.com/avatar" blamer--fallback-avatar-uploader)
+  '("https://www.gravatar.com/avatar" blamer--fallback-avatar-uploader)
   "Fallback avatar config."
   :group 'blamer
   :type 'list)
@@ -598,6 +598,13 @@ REMOTE-URL - url of resource to download avatar."
              (avatar-url (gethash "avatar_url" json-data)))
     (blamer--upload-avatar avatar-url file-path)))
 
+(defun blamer--normalize-file-path (file-path)
+  "Normalize FILE-PATH for Windows."
+  (setq file-path (replace-regexp-in-string ">" "" file-path))
+  (setq file-path (replace-regexp-in-string " " "-" file-path))
+  (setq file-path (replace-regexp-in-string "<" "" file-path))
+  file-path)
+
 (defun blamer--upload-avatar (url file-path)
   "Download the avatar from URL and save it to the path as FILE-PATH.
 HOST-NAME is the name of the host for caching.
@@ -605,8 +612,10 @@ host folder.
 If the file already exists, return the path to the existing file."
   (unless (file-exists-p (file-name-directory file-path))
     (make-directory (file-name-directory file-path) t))
-  (url-copy-file url file-path t)
-  file-path)
+  (setq file-path (blamer--normalize-file-path file-path))
+  (ignore-errors
+    (url-copy-file url file-path t)
+    file-path))
 
 
 (defun blamer--find-avatar-uploader (remote-ref)
