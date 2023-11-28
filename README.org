@@ -16,7 +16,7 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 (use-package blamer
   :ensure t
   :bind (("s-i" . blamer-show-commit-info)
-         ("C-c i" . ("s-i" . blamer-show-posframe-commit-info)))
+         ("C-c i" . blamer-show-posframe-commit-info))
   :defer 20
   :custom
   (blamer-idle-time 0.3)
@@ -35,7 +35,7 @@ A git blame plugin for emacs inspired by [[https://marketplace.visualstudio.com/
 (use-package blamer
   :quelpa ((blamer :fetcher github :repo "artawower/blamer.el") :upgrade t)
   :bind (("s-i" . blamer-show-commit-info)
-         ("C-c i" . ("s-i" . blamer-show-posframe-commit-info)))
+         ("C-c i" . blamer-show-posframe-commit-info))
   :custom
   (blamer-idle-time 0.3)
   (blamer-min-offset 70)
