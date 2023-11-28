@@ -526,11 +526,12 @@ Rusn CALLBACK with partial user-info plist."
       callback))))
 
 (defun blamer--async-parse-line-info (blame-msg callback line-number &optional include-avatar-p)
-  "Parse BLAME-MSG and create a plist.
+  "Parse BLAME-MSG from LINE-NUMBER and create a plist with commit info.
 
 When INCLUDE-AVATAR-P provided and non-nil,
 avatar will be downloaded and included in the plist.
 Run CALLBACK after async process is done."
+
   (string-match blamer--regexp-info blame-msg)
   (let* ((commit-hash (string-trim (match-string 1 blame-msg)))
          (raw-commit-author (match-string 2 blame-msg))
@@ -849,7 +850,7 @@ Return list of strings."
     (add-to-list 'blamer--overlays ov)))
 
 (defun blamer--render-right-overlay (commit-info render-point)
-  "Render COMMIT-INFO as overlay at right position."
+  "Render COMMIT-INFO as overlay at RENDER-POINT position."
   (when-let ((ov (progn (move-end-of-line nil)
                         (make-overlay render-point render-point nil t t)))
              (popup-msg (blamer--create-popup-msg commit-info)))
@@ -907,7 +908,7 @@ Return list of strings."
                       `(:string , pretty-content)))))))
 
 (defun blamer--render-line-overlay (commit-info buffer render-point &optional type)
-  "Render COMMIT-INFO overlay by optional TYPE.
+  "Render COMMIT-INFO overlay by optional TYPE in the BUFFER at the RENDER-POINT.
 when not provided `blamer-type' will be used."
   (with-current-buffer buffer
     (save-excursion
@@ -916,7 +917,8 @@ when not provided `blamer-type' will be used."
             (t (blamer--render-right-overlay commit-info render-point))))))
 
 (defun blamer--get-async-blame-info (file-name start-line end-line callback)
-  "Get blame info for FILE-NAME from START-LINE to END-LINE.  CALLBACK will be called with result."
+  "Get blame info for FILE-NAME from START-LINE to END-LINE.
+CALLBACK will be called with result."
   (when-let*
       ((command (append blamer--git-blame-cmd
                         (list (format "%s,%s" start-line end-line))))
@@ -970,10 +972,12 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
 
 (defun blamer--handle-async-blame-info-result (commit-infos buffer start-line-number include-avatar-p &optional type)
   "Handle COMMIT-INFOS for BUFFER and START-LINE-NUMBER.
+INCLUDE-AVATAR-P is optional argument that can replace
+global `blamer-show-avatar-p' variable
 TYPE is optional view render type."
   (let ((line-number start-line-number))
     ;; TODO: enhancement/async-cmd method
-    (goto-line start-line-number)
+    (blamer--goto-line start-line-number)
     (dolist (cmd-msg commit-infos)
       (unless (blamer--git-cmd-error-p cmd-msg)
         (blamer--async-parse-line-info
@@ -988,11 +992,17 @@ TYPE is optional view render type."
          include-avatar-p)
         (setq line-number (1+ line-number))))))
 
+(defun blamer--goto-line (line-number)
+  "Go to LINE-NUMBER."
+  (unless (eq line-number (line-number-at-pos))
+    (let ((current-line-number (line-number-at-pos)))
+      (forward-line (- line-number current-line-number)))))
+
 (defun blamer--get-render-point (buffer line-number)
   "Return render point by LINE-NUMBER from BUFFER."
   (with-current-buffer buffer
     (save-excursion
-      (goto-line line-number)
+      (blamer--goto-line line-number)
       (end-of-line)
       (point))))
 
