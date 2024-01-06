@@ -50,7 +50,7 @@
 3 - date
 3 - time")
 
-(defconst blamer--commit-message-regexp "\n\n[\s]+\\(?1:[^\']+\\):?"
+(defconst blamer--commit-message-regexp "\n\n[\s]+\\(\\(?:.\\|\n\\)+\\):?"
   "Regexp for commit message parsing.")
 
 (defconst blamer--git-author-cmd '("config" "--get" "user.name")
@@ -541,7 +541,7 @@ Run CALLBACK after async process is done."
                           raw-commit-author))
          (commit-date (match-string 3 blame-msg))
          (commit-time (match-string 4 blame-msg)))
-    ;; TODO: enhancement/async-cmd external function as handler
+
     (blamer--async-get-email-commit-message
      commit-hash
      (lambda (info)
@@ -976,7 +976,6 @@ INCLUDE-AVATAR-P is optional argument that can replace
 global `blamer-show-avatar-p' variable
 TYPE is optional view render type."
   (let ((line-number start-line-number))
-    ;; TODO: enhancement/async-cmd method
     (blamer--goto-line start-line-number)
     (dolist (cmd-msg commit-infos)
       (unless (blamer--git-cmd-error-p cmd-msg)
