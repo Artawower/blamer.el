@@ -4,8 +4,8 @@
 
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
-;; Package-Requires: ((emacs "27.1") (posframe "1.1.7"))
-;; Version: 0.7.4
+;; Package-Requires: ((emacs "27.1") (posframe "1.1.7") (async "1.9.7"))
+;; Version: 0.8.0
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -34,6 +34,7 @@
 (require 'url)
 (require 'vc-git)
 (require 'seq)
+(require 'async)
 
 (eval-when-compile
   (require 'subr-x))
@@ -339,6 +340,9 @@ author name by left click and copying commit hash by right click.
 (defvar blamer--buffer-name "*blamer*"
   "Name of buffer for git blame messages.")
 
+(defvar blamer--async-processes '()
+  "List of currently running asynchronous processes.")
+
 (defvar-local blamer--current-author nil
   "Git.name for current repository.")
 
@@ -498,22 +502,36 @@ COMMIT-INFO - all the commit information, for `blamer--apply-bindings'"
 
     (concat alignment-text formatted-message)))
 
-(defun blamer--get-commit-messages (hash)
-  "Get commit message by provided HASH.
-Return nil if error."
-  (let* ((git-commit-res (apply #'vc-git--run-command-string nil (append blamer--git-commit-message (list hash))))
-         (has-error (or (blamer--git-cmd-error-p git-commit-res) (eq (length git-commit-res) 0)))
+(defun blamer--extract-commit-messages (git-commit-res)
+  "Extract commit messages from GIT-COMMIT-RES."
+  (let* ((has-error (or (blamer--git-cmd-error-p git-commit-res) (eq (length git-commit-res) 0)))
          commit-message)
     (unless has-error
       (string-match blamer--commit-message-regexp git-commit-res)
       (setq commit-message (match-string 1 git-commit-res))
       (split-string commit-message "\n"))))
 
-(defun blamer--parse-line-info (blame-msg &optional include-avatar-p)
-  "Parse BLAME-MSG and create a plist.
+(defun blamer--async-get-email-commit-message (commit-hash callback)
+  "Get email and commit message for COMMIT-HASH asynchronously.
+Rusn CALLBACK with partial user-info plist."
+  (add-to-list
+   'blamer--async-processes
+   (let ((commit-info-args (append blamer--git-commit-message (list commit-hash))))
+     (async-start
+      `(lambda ()
+         (require 'vc-git)
+         (let* ((author-email (vc-git--run-command-string nil "log" "-n1" "--pretty=format:%ae" ,commit-hash))
+                (commit-res (vc-git--run-command-string nil ,@commit-info-args)))
+           (list author-email commit-res)))
+      callback))))
+
+(defun blamer--async-parse-line-info (blame-msg callback line-number &optional include-avatar-p)
+  "Parse BLAME-MSG from LINE-NUMBER and create a plist with commit info.
 
 When INCLUDE-AVATAR-P provided and non-nil,
-avatar will be downloaded and included in the plist."
+avatar will be downloaded and included in the plist.
+Run CALLBACK after async process is done."
+
   (string-match blamer--regexp-info blame-msg)
   (let* ((commit-hash (string-trim (match-string 1 blame-msg)))
          (raw-commit-author (match-string 2 blame-msg))
@@ -522,35 +540,43 @@ avatar will be downloaded and included in the plist."
                             blamer-self-author-name
                           raw-commit-author))
          (commit-date (match-string 3 blame-msg))
-         (commit-time (match-string 4 blame-msg))
-         (commit-messages (blamer--get-commit-messages commit-hash))
-         (author-email (vc-git--run-command-string nil "log" "-n1" "--pretty=format:%ae" commit-hash))
-         (commit-message (car commit-messages))
-         (commit-message (when commit-message (string-trim commit-message)))
-         (commit-message (when (and blamer-commit-formatter commit-message)
-                           (truncate-string-to-width
-                            commit-message
-                            blamer-max-commit-message-length nil nil "...")))
-         (commit-description (cdr commit-messages))
-         (raw-commit-message (nth 1 commit-messages))
-         (avatar (when (and
-                        blamer-show-avatar-p
-                        include-avatar-p
-                        (not uncommitted)
-                        (display-graphic-p))
-                   (blamer--get-avatar author-email)))
-         (parsed-commit-info `(:commit-hash ,commit-hash
-                                            :author-email ,author-email
-                                            :commit-author ,commit-author
-                                            :commit-date ,commit-date
-                                            :commit-time ,commit-time
-                                            :commit-avatar ,avatar
-                                            :raw-commit-author ,raw-commit-author
-                                            :commit-message ,commit-message
-                                            :commit-description ,commit-description
-                                            :raw-commit-message ,raw-commit-message)))
+         (commit-time (match-string 4 blame-msg)))
 
-    parsed-commit-info))
+    (blamer--async-get-email-commit-message
+     commit-hash
+     (lambda (info)
+       (let* ((author-email (car info))
+              (commit-messages (cadr info))
+              (commit-messages commit-messages)
+              (commit-messages (blamer--extract-commit-messages commit-messages))
+              (commit-message (car commit-messages))
+              (commit-message (when commit-message (string-trim commit-message)))
+              (commit-message (when (and blamer-commit-formatter commit-message)
+                                (truncate-string-to-width
+                                 commit-message
+                                 blamer-max-commit-message-length nil nil "...")))
+              (commit-description (cdr commit-messages))
+              (raw-commit-message (nth 1 commit-messages))
+              (avatar (when (and
+                             blamer-show-avatar-p
+                             include-avatar-p
+                             (not uncommitted)
+                             (display-graphic-p))
+                        (blamer--get-avatar author-email))))
+         (funcall
+          callback
+          `(:commit-hash ,commit-hash
+                         :author-email ,author-email
+                         :commit-author ,commit-author
+                         :commit-date ,commit-date
+                         :commit-time ,commit-time
+                         :commit-avatar ,avatar
+                         :raw-commit-author ,raw-commit-author
+                         :commit-message ,commit-message
+                         :commit-description ,commit-description
+                         :raw-commit-message ,raw-commit-message
+                         :line-number ,line-number)))))
+    ))
 
 (defun blamer--github-avatar-uploader (remote-url file-path author-email)
   "Download the author avatar from REMOTE-URL using the AUTHOR-EMAIL to FILE-PATH."
@@ -823,10 +849,10 @@ Return list of strings."
     (overlay-put ov 'window (get-buffer-window))
     (add-to-list 'blamer--overlays ov)))
 
-(defun blamer--render-right-overlay (commit-info)
-  "Render COMMIT-INFO as overlay at right position."
+(defun blamer--render-right-overlay (commit-info render-point)
+  "Render COMMIT-INFO as overlay at RENDER-POINT position."
   (when-let ((ov (progn (move-end-of-line nil)
-                        (make-overlay (point) (point) nil t t)))
+                        (make-overlay render-point render-point nil t t)))
              (popup-msg (blamer--create-popup-msg commit-info)))
 
     (overlay-put ov 'after-string popup-msg)
@@ -881,12 +907,31 @@ Return list of strings."
                       blamer-posframe-configurations
                       `(:string , pretty-content)))))))
 
-(defun blamer--render-line-overlay (commit-info &optional type)
-  "Render COMMIT-INFO overlay by optional TYPE.
+(defun blamer--render-line-overlay (commit-info buffer render-point &optional type)
+  "Render COMMIT-INFO overlay by optional TYPE in the BUFFER at the RENDER-POINT.
 when not provided `blamer-type' will be used."
-  (cond ((eq (or type blamer-type) 'overlay-popup) (blamer--render-overlay-popup commit-info))
-        ((eq (or type blamer-type) 'posframe-popup) (blamer--render-posframe-popup commit-info))
-        (t (blamer--render-right-overlay commit-info))))
+  (with-current-buffer buffer
+    (save-excursion
+      (cond ((eq (or type blamer-type) 'overlay-popup) (blamer--render-overlay-popup commit-info))
+            ((eq (or type blamer-type) 'posframe-popup) (blamer--render-posframe-popup commit-info))
+            (t (blamer--render-right-overlay commit-info render-point))))))
+
+(defun blamer--get-async-blame-info (file-name start-line end-line callback)
+  "Get blame info for FILE-NAME from START-LINE to END-LINE.
+CALLBACK will be called with result."
+  (when-let*
+      ((command (append blamer--git-blame-cmd
+                        (list (format "%s,%s" start-line end-line))))
+       (process (async-start
+                 `(lambda ()
+                    (require 'vc-git)
+                    (setq blame-cmd-res (apply #'vc-git--run-command-string ,file-name ',command))
+                    (if blame-cmd-res
+                        (butlast (split-string blame-cmd-res "\n"))
+                      '())
+                    )
+                 callback)))
+    (add-to-list 'blamer--async-processes process)))
 
 (defun blamer--render (&optional type)
   "Render text about current line commit status.
@@ -907,11 +952,7 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
                                   (line-number-at-pos)))
              (file-name (blamer--get-local-name (buffer-file-name)))
              (include-avatar-p (member type '(posframe-popup overlay-popup)))
-             (blame-cmd-res (when file-name
-                              (apply #'vc-git--run-command-string file-name
-                                     (append blamer--git-blame-cmd
-                                             (list (format "%s,%s" start-line-number end-line-number))))))
-             (blame-cmd-res (when blame-cmd-res (butlast (split-string blame-cmd-res "\n")))))
+             (current-buffer (current-buffer)))
 
         (blamer--clear-overlay)
 
@@ -919,11 +960,50 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
           (when (region-active-p)
             (goto-char (region-beginning)))
 
-          (dolist (cmd-msg blame-cmd-res)
-            (unless (blamer--git-cmd-error-p cmd-msg)
-              (let ((commit-info (blamer--parse-line-info cmd-msg include-avatar-p)))
-                (blamer--render-line-overlay commit-info type)
-                (forward-line)))))))))
+          (blamer--get-async-blame-info
+           file-name start-line-number end-line-number
+           (lambda (commit-infos)
+             (blamer--handle-async-blame-info-result
+              commit-infos
+              current-buffer
+              start-line-number
+              include-avatar-p
+              type))))))))
+
+(defun blamer--handle-async-blame-info-result (commit-infos buffer start-line-number include-avatar-p &optional type)
+  "Handle COMMIT-INFOS for BUFFER and START-LINE-NUMBER.
+INCLUDE-AVATAR-P is optional argument that can replace
+global `blamer-show-avatar-p' variable
+TYPE is optional view render type."
+  (let ((line-number start-line-number))
+    (blamer--goto-line start-line-number)
+    (dolist (cmd-msg commit-infos)
+      (unless (blamer--git-cmd-error-p cmd-msg)
+        (blamer--async-parse-line-info
+         cmd-msg
+         (lambda (commit-info)
+           (blamer--render-line-overlay
+            commit-info
+            buffer
+            (blamer--get-render-point buffer (plist-get commit-info :line-number))
+            type))
+         line-number
+         include-avatar-p)
+        (setq line-number (1+ line-number))))))
+
+(defun blamer--goto-line (line-number)
+  "Go to LINE-NUMBER."
+  (unless (eq line-number (line-number-at-pos))
+    (let ((current-line-number (line-number-at-pos)))
+      (forward-line (- line-number current-line-number)))))
+
+(defun blamer--get-render-point (buffer line-number)
+  "Return render point by LINE-NUMBER from BUFFER."
+  (with-current-buffer buffer
+    (save-excursion
+      (blamer--goto-line line-number)
+      (end-of-line)
+      (point))))
 
 (defun blamer--safety-render (&optional type)
   "Function for checking current active blamer type before rendering with delay.
@@ -941,6 +1021,8 @@ Optional TYPE argument will override global `blamer-type'."
   "Render commit info with delay."
   (when blamer-idle-timer
     (cancel-timer blamer-idle-timer))
+
+  (blamer--kill-async-processes)
 
   (setq blamer-idle-timer
         (run-with-idle-timer (or blamer-idle-time 0) nil 'blamer--safety-render)))
@@ -985,6 +1067,12 @@ LOCAL-TYPE is force replacement of current `blamer-type' for handle rendering."
       (blamer--render-commit-info-with-delay))
 
     (blamer--preserve-state)))
+
+(defun blamer--kill-async-processes ()
+  "Kill currently running async processes."
+  (dolist (process blamer--async-processes)
+    (when (process-live-p process)
+      (kill-process process))))
 
 (defun blamer--reset-state ()
   "Reset all state after blamer mode is disabled."
