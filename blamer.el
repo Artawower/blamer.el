@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (posframe "1.1.7") (async "1.9.7"))
-;; Version: 0.8.0
+;; Version: 0.8.1
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -920,16 +920,15 @@ when not provided `blamer-type' will be used."
   "Get blame info for FILE-NAME from START-LINE to END-LINE.
 CALLBACK will be called with result."
   (when-let*
-      ((command (append blamer--git-blame-cmd
+      ((file-name file-name)
+       (command (append blamer--git-blame-cmd
                         (list (format "%s,%s" start-line end-line))))
        (process (async-start
                  `(lambda ()
                     (require 'vc-git)
                     (setq blame-cmd-res (apply #'vc-git--run-command-string ,file-name ',command))
-                    (if blame-cmd-res
-                        (butlast (split-string blame-cmd-res "\n"))
-                      '())
-                    )
+                    ;; TODO: research this rude fix
+                    (base64-encode-string blame-cmd-res))
                  callback)))
     (add-to-list 'blamer--async-processes process)))
 
@@ -970,26 +969,32 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
               include-avatar-p
               type))))))))
 
-(defun blamer--handle-async-blame-info-result (commit-infos buffer start-line-number include-avatar-p &optional type)
-  "Handle COMMIT-INFOS for BUFFER and START-LINE-NUMBER.
+(defun blamer--handle-async-blame-info-result (encoded-commit-infos buffer start-line-number include-avatar-p &optional type)
+  "Handle base64 ENCODED-COMMIT-INFOS for BUFFER and START-LINE-NUMBER.
 INCLUDE-AVATAR-P is optional argument that can replace
 global `blamer-show-avatar-p' variable
 TYPE is optional view render type."
-  (let ((line-number start-line-number))
-    (blamer--goto-line start-line-number)
-    (dolist (cmd-msg commit-infos)
-      (unless (blamer--git-cmd-error-p cmd-msg)
-        (blamer--async-parse-line-info
-         cmd-msg
-         (lambda (commit-info)
-           (blamer--render-line-overlay
-            commit-info
-            buffer
-            (blamer--get-render-point buffer (plist-get commit-info :line-number))
-            type))
-         line-number
-         include-avatar-p)
-        (setq line-number (1+ line-number))))))
+  (when encoded-commit-infos
+    (let* ((commit-infos (base64-decode-string encoded-commit-infos))
+           (commit-infos (if commit-infos
+                             (butlast (split-string commit-infos "\n"))
+                           '())
+                         )
+           (line-number start-line-number))
+      (blamer--goto-line start-line-number)
+      (dolist (cmd-msg commit-infos)
+        (unless (blamer--git-cmd-error-p cmd-msg)
+          (blamer--async-parse-line-info
+           cmd-msg
+           (lambda (commit-info)
+             (blamer--render-line-overlay
+              commit-info
+              buffer
+              (blamer--get-render-point buffer (plist-get commit-info :line-number))
+              type))
+           line-number
+           include-avatar-p)
+          (setq line-number (1+ line-number)))))))
 
 (defun blamer--goto-line (line-number)
   "Go to LINE-NUMBER."
