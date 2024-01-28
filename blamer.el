@@ -1151,6 +1151,21 @@ will appear after BLAMER-IDLE-TIME.  It works only inside git repo"
       (add-hook 'post-command-hook #'blamer--try-render nil t)
       (add-hook 'window-state-change-hook #'blamer--try-render nil t))))
 
+(defun blamer-kill-ring-commit-hash ()
+  "Copy to kill-ring the current line's blame commit hash."
+  (interactive)
+  (lexical-let ((this-line-number (line-number-at-pos))
+                (current-buffer (current-buffer)))
+    (blamer--get-async-blame-info
+      (blamer--get-local-name (buffer-file-name))
+      this-line-number this-line-number
+      (lambda (encoded-commit-info)
+        (unless encoded-commit-info
+          (error "blamer: Could not retrieve commit information for this line."))
+        (let ((info (base64-decode-string encoded-commit-info)))
+          (when (string-match "^\\([[:xdigit:]]+\\) " info)
+            (kill-new (match-string 1 info))))))))
+
 ;;;###autoload
 (defun blamer-show-commit-info (&optional type)
   "Show commit info from git blame.
