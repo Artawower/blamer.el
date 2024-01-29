@@ -1151,7 +1151,7 @@ will appear after BLAMER-IDLE-TIME.  It works only inside git repo"
       (add-hook 'post-command-hook #'blamer--try-render nil t)
       (add-hook 'window-state-change-hook #'blamer--try-render nil t))))
 
-;;###autoload
+;;;###autoload
 (defun blamer-kill-ring-commit-hash ()
   "Copy to kill-ring the current line's blame commit hash."
   (interactive)
@@ -1166,7 +1166,7 @@ will appear after BLAMER-IDLE-TIME.  It works only inside git repo"
           (when (string-match "^\\([[:xdigit:]]+\\) " info)
             (kill-new (match-string 1 info))))))))
 
-;;###autoload
+;;;###autoload
 (defun blamer-show-commit-info (&optional type)
   "Show commit info from git blame.
 
