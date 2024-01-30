@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (posframe "1.1.7") (async "1.9.7"))
-;; Version: 0.8.1
+;; Version: 0.8.2
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -115,13 +115,13 @@ Will add additional space for each BLAMER-OFFSET-PER-SYMBOL"
 
 (defcustom blamer-type 'both
   "Type of blamer.
-\\=visual - show blame only for current line
-\\=selected - show blame only for selected line
-\\=both - both of them
+\\='visual - show blame only for current line
+\\='selected - show blame only for selected line
+\\='both - both of them
 
 This types are used only for single line blame.
-\\=overlay-popup - show commit info inside pretty overlay
-\\=posframe-popup - show commit info inside pretty posframe window"
+\\='overlay-popup - show commit info inside pretty overlay
+\\='posframe-popup - show commit info inside pretty posframe window"
   :group 'blamer
   :type '(choice (const :tag "Visual only" visual)
                  (const :tag "Pretty overlay popup" overlay-popup)
@@ -228,6 +228,10 @@ Each element is a cons cell (REGEXP . FUNCTION)."
   :group 'blamer
   :type 'list)
 
+(defcustom blamer-enable-async-execution-p t
+  "Should blamer use async execution."
+  :group 'blamer
+  :type 'boolean)
 
 (defcustom blamer-posframe-configurations
   '(:left-fringe 16
@@ -517,7 +521,7 @@ Rusn CALLBACK with partial user-info plist."
   (add-to-list
    'blamer--async-processes
    (let ((commit-info-args (append blamer--git-commit-message (list commit-hash))))
-     (async-start
+     (blamer--async-start
       `(lambda ()
          (require 'vc-git)
          (let* ((author-email (vc-git--run-command-string nil "log" "-n1" "--pretty=format:%ae" ,commit-hash))
@@ -923,12 +927,10 @@ CALLBACK will be called with result."
       ((file-name file-name)
        (command (append blamer--git-blame-cmd
                         (list (format "%s,%s" start-line end-line))))
-       (process (async-start
+       (process (blamer--async-start
                  `(lambda ()
                     (require 'vc-git)
-                    (setq blame-cmd-res (apply #'vc-git--run-command-string ,file-name ',command))
-                    ;; TODO: research this rude fix
-                    (base64-encode-string blame-cmd-res))
+                    (apply #'vc-git--run-command-string ,file-name ',command))
                  callback)))
     (add-to-list 'blamer--async-processes process)))
 
@@ -969,32 +971,29 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
               include-avatar-p
               type))))))))
 
-(defun blamer--handle-async-blame-info-result (encoded-commit-infos buffer start-line-number include-avatar-p &optional type)
-  "Handle base64 ENCODED-COMMIT-INFOS for BUFFER and START-LINE-NUMBER.
+(defun blamer--handle-async-blame-info-result (commit-infos buffer start-line-number include-avatar-p &optional type)
+  "Handle COMMIT-INFOS for BUFFER and START-LINE-NUMBER.
 INCLUDE-AVATAR-P is optional argument that can replace
 global `blamer-show-avatar-p' variable
 TYPE is optional view render type."
-  (when encoded-commit-infos
-    (let* ((commit-infos (base64-decode-string encoded-commit-infos))
-           (commit-infos (if commit-infos
-                             (butlast (split-string commit-infos "\n"))
-                           '())
-                         )
-           (line-number start-line-number))
-      (blamer--goto-line start-line-number)
-      (dolist (cmd-msg commit-infos)
-        (unless (blamer--git-cmd-error-p cmd-msg)
-          (blamer--async-parse-line-info
-           cmd-msg
-           (lambda (commit-info)
-             (blamer--render-line-overlay
-              commit-info
-              buffer
-              (blamer--get-render-point buffer (plist-get commit-info :line-number))
-              type))
-           line-number
-           include-avatar-p)
-          (setq line-number (1+ line-number)))))))
+  (let* ((commit-infos (if commit-infos
+                           (butlast (split-string commit-infos "\n"))
+                         '()))
+         (line-number start-line-number))
+    (blamer--goto-line start-line-number)
+    (dolist (cmd-msg commit-infos)
+      (unless (blamer--git-cmd-error-p cmd-msg)
+        (blamer--async-parse-line-info
+         cmd-msg
+         (lambda (commit-info)
+           (blamer--render-line-overlay
+            commit-info
+            buffer
+            (blamer--get-render-point buffer (plist-get commit-info :line-number))
+            type))
+         line-number
+         include-avatar-p)
+        (setq line-number (1+ line-number))))))
 
 (defun blamer--goto-line (line-number)
   "Go to LINE-NUMBER."
@@ -1151,20 +1150,31 @@ will appear after BLAMER-IDLE-TIME.  It works only inside git repo"
       (add-hook 'post-command-hook #'blamer--try-render nil t)
       (add-hook 'window-state-change-hook #'blamer--try-render nil t))))
 
+(defun blamer--async-start (start-func &optional finish-func)
+  "Optional wrapper over \\='async-start function.
+
+Needed for toggling async execution for better debug.
+START-FUNC - function to start
+FINISH-FUNC - callback which will be printed after main function finished"
+  (if blamer-enable-async-execution-p
+      (async-start start-func finish-func)
+    (if finish-func
+        (funcall finish-func (funcall start-func))
+      (funcall start-func))))
+
 ;;;###autoload
 (defun blamer-kill-ring-commit-hash ()
-  "Copy to kill-ring the current line's blame commit hash."
+  "Copy to \\='kill-ring the current line's blame commit hash."
   (interactive)
   (let ((this-line-number (line-number-at-pos)))
     (blamer--get-async-blame-info
-      (blamer--get-local-name (buffer-file-name))
-      this-line-number this-line-number
-      (lambda (encoded-commit-info)
-        (unless encoded-commit-info
-          (error "blamer: Could not retrieve commit information for this line."))
-        (let ((info (base64-decode-string encoded-commit-info)))
-          (when (string-match "^\\([[:xdigit:]]+\\) " info)
-            (kill-new (match-string 1 info))))))))
+     (blamer--get-local-name (buffer-file-name))
+     this-line-number this-line-number
+     (lambda (commit-info)
+       (unless commit-info
+         (error "blamer: Could not retrieve commit information for this line"))
+       (when (string-match "^\\([[:xdigit:]]+\\) " commit-info)
+         (kill-new (match-string 1 commit-info)))))))
 
 ;;;###autoload
 (defun blamer-show-commit-info (&optional type)
@@ -1186,3 +1196,4 @@ TYPE - optional parameter, by default will use `overlay-popup'."
 
 (provide 'blamer)
 ;;; blamer.el ends here
+
