@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (posframe "1.1.7") (async "1.9.8"))
-;; Version: 0.8.3
+;; Version: 0.8.4
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -508,9 +508,9 @@ COMMIT-INFO - all the commit information, for `blamer--apply-bindings'"
   (let* ((has-error (or (blamer--git-cmd-error-p git-commit-res) (eq (length git-commit-res) 0)))
          commit-message)
     (unless has-error
-      (string-match blamer--commit-message-regexp git-commit-res)
-      (setq commit-message (match-string 1 git-commit-res))
-      (split-string commit-message "\n"))))
+      (when (string-match blamer--commit-message-regexp git-commit-res)
+        (setq commit-message (match-string 1 git-commit-res))
+        (split-string commit-message "\n")))))
 
 (defun blamer--async-get-email-commit-message (commit-hash callback)
   "Get email and commit message for COMMIT-HASH asynchronously.
