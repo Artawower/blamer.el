@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (posframe "1.1.7") (async "1.9.8"))
-;; Version: 0.8.4
+;; Version: 0.8.5
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -197,7 +197,7 @@ This feature required Emacs built with `imagemagick'"
 (defcustom blamer-avatar-size 96
   "Size of avatar."
   :group 'blamer
-  :type 'int)
+  :type 'integer)
 
 (defcustom blamer-avatar-ratio '(3 . 3)
   "Image ration for avatar."
@@ -207,7 +207,7 @@ This feature required Emacs built with `imagemagick'"
 (defcustom blamer-avatar-cache-time 604800
   "Time in seconds to cache avatar.  Default value is 1 week."
   :group 'blamer
-  :type 'int)
+  :type 'integer)
 
 (defcustom blamer-avatar-folder "~/.blamer/avatars/"
   "Folder for avatars."
@@ -316,6 +316,13 @@ author name by left click and copying commit hash by right click.
                  (const :tag "Commit message" blamer-tooltip-commit-message)
                  (const :tag "Info about author" blamer-tooltip-author-info)
                  (const :tag "No tooltip" nil)))
+
+(defcustom blamer-symbol-count-before-new-line 0
+  "The number of characters before the end of the line.
+May be useful in some cases where the accuser unexpectedly
+moves to the next line."
+  :group 'blamer
+  :type 'integer)
 
 (defvar blamer-idle-timer nil
   "Current timer before commit info showing.")
@@ -694,8 +701,11 @@ Works only for github right now."
 
 (defun blamer--maybe-normalize-truncated-line (text)
   "Disable line break for truncated line by truncated TEXT for available width."
+
   (if (and (not truncate-lines) blamer-force-truncate-long-line)
-      (truncate-string-to-width text (- (blamer--get-available-width-before-window-end) (blamer--get-line-number-column-width)))
+      (truncate-string-to-width text (- (blamer--get-available-width-before-window-end)
+                                        (blamer--get-line-number-column-width)
+                                        blamer-symbol-count-before-new-line))
     text))
 
 (defun blamer--create-popup-msg (commit-info)
