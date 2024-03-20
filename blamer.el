@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (posframe "1.1.7") (async "1.9.8"))
-;; Version: 0.8.5
+;; Version: 0.8.6
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -1160,11 +1160,13 @@ will appear after BLAMER-IDLE-TIME.  It works only inside git repo"
 Needed for toggling async execution for better debug.
 START-FUNC - function to start
 FINISH-FUNC - callback which will be printed after main function finished"
-  (if blamer-enable-async-execution-p
-      (async-start start-func finish-func)
-    (if finish-func
-        (funcall finish-func (funcall start-func))
-      (funcall start-func))))
+  (let ((async-prompt-for-password nil))
+    (ignore async-prompt-for-password)
+    (if blamer-enable-async-execution-p
+        (async-start start-func finish-func)
+      (if finish-func
+          (funcall finish-func (funcall start-func))
+        (funcall start-func)))))
 
 ;;;###autoload
 (defun blamer-kill-ring-commit-hash ()
