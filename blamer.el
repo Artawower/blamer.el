@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (posframe "1.1.7") (async "1.9.8"))
-;; Version: 0.8.6
+;; Version: 0.8.7
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -376,6 +376,7 @@ Will show the available `blamer-bindings'."
   (when-let* ((file-name (blamer--get-local-name (buffer-file-name))))
     (vc-backend file-name)))
 
+;;;###autoload
 (defun blamer--clear-overlay ()
   "Clear last overlay."
   (dolist (ov blamer--overlays)
@@ -864,7 +865,8 @@ Return list of strings."
                         (make-overlay render-point render-point nil t t)))
              (popup-msg (blamer--create-popup-msg commit-info)))
 
-    (overlay-put ov 'after-string popup-msg)
+    (overlay-put ov 'priority 65001)
+    (overlay-put ov 'before-string popup-msg)
     (overlay-put ov 'intangible t)
     (overlay-put ov 'window (get-buffer-window))
     (add-to-list 'blamer--overlays ov)))
