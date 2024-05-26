@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (posframe "1.1.7") (async "1.9.8"))
-;; Version: 0.8.7
+;; Version: 0.9.0
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -118,6 +118,7 @@ Will add additional space for each BLAMER-OFFSET-PER-SYMBOL"
 \\='visual - show blame only for current line
 \\='selected - show blame only for selected line
 \\='both - both of them
+\\='margin-overlay - show blame in margin.
 
 This types are used only for single line blame.
 \\='overlay-popup - show commit info inside pretty overlay
@@ -127,6 +128,7 @@ This types are used only for single line blame.
                  (const :tag "Pretty overlay popup" overlay-popup)
                  (const :tag "Pretty posframe popup" posframe-popup)
                  (const :tag "Visual and selected" both)
+                 (const :tag "Margin overlay" margin-overlay)
                  (const :tag "Selected only" selected)))
 
 (defcustom blamer--overlay-popup-position 'bottom
@@ -859,6 +861,18 @@ Return list of strings."
     (overlay-put ov 'window (get-buffer-window))
     (add-to-list 'blamer--overlays ov)))
 
+(defun blamer--render-margin-overlay (commit-info render-point)
+  "Render COMMIT-INFO as overlay at RENDER-POINT position in the right overlay."
+  (when-let* ((ov (progn (move-end-of-line nil)
+                         (make-overlay render-point render-point nil t t)))
+              (popup-msg (blamer--create-popup-msg commit-info)))
+    (overlay-put ov 'priority 65001)
+    (overlay-put ov 'before-string
+                 (propertize " " 'display `((margin right-margin) ,popup-msg)))
+    (overlay-put ov 'intangible t)
+    (overlay-put ov 'window (get-buffer-window))
+    (add-to-list 'blamer--overlays ov)))
+
 (defun blamer--render-right-overlay (commit-info render-point)
   "Render COMMIT-INFO as overlay at RENDER-POINT position."
   (when-let ((ov (progn (move-end-of-line nil)
@@ -925,6 +939,7 @@ when not provided `blamer-type' will be used."
     (save-excursion
       (cond ((eq (or type blamer-type) 'overlay-popup) (blamer--render-overlay-popup commit-info))
             ((eq (or type blamer-type) 'posframe-popup) (blamer--render-posframe-popup commit-info))
+            ((eq (or type blamer-type) 'margin-overlay) (blamer--render-margin-overlay commit-info render-point))
             (t (blamer--render-right-overlay commit-info render-point))))))
 
 (defun blamer--get-async-blame-info (file-name start-line end-line callback)
@@ -1071,6 +1086,7 @@ LOCAL-TYPE is force replacement of current `blamer-type' for handle rendering."
     (when (and (not long-region-p)
                (not blamer--block-render-p)
                (or (eq type 'both)
+                   (eq type 'margin-overlay)
                    (and (eq type 'visual) (not (use-region-p)))
                    (and (eq type 'overlay-popup) (not (use-region-p)))
                    (and (eq type 'selected) (use-region-p)))
