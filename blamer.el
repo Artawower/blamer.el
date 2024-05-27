@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (posframe "1.1.7") (async "1.9.8"))
-;; Version: 0.9.0
+;; Version: 0.9.1
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -711,8 +711,9 @@ Works only for github right now."
                                         blamer-symbol-count-before-new-line))
     text))
 
-(defun blamer--create-popup-msg (commit-info)
-  "Handle current COMMIT-INFO."
+(defun blamer--create-popup-msg (commit-info &optional not-truncate-p)
+  "Handle current COMMIT-INFO.
+Optional disable truncating with NOT-TRUNCATE-P."
   (let* ((offset (max (- (or blamer-min-offset 0) (length (thing-at-point 'line))) 0))
          (commit-author (plist-get commit-info :commit-author))
          (popup-message (blamer--format-commit-info (plist-get commit-info :commit-hash)
@@ -722,7 +723,7 @@ Works only for github right now."
                                                     (plist-get commit-info :commit-time)
                                                     offset
                                                     commit-info))
-         (popup-message (blamer--maybe-normalize-truncated-line popup-message)))
+         (popup-message (if (not not-truncate-p) (blamer--maybe-normalize-truncated-line popup-message) popup-message)))
 
     (when (and commit-author (not (string= commit-author "")))
       popup-message)))
@@ -865,7 +866,7 @@ Return list of strings."
   "Render COMMIT-INFO as overlay at RENDER-POINT position in the right overlay."
   (when-let* ((ov (progn (move-end-of-line nil)
                          (make-overlay render-point render-point nil t t)))
-              (popup-msg (blamer--create-popup-msg commit-info)))
+              (popup-msg (blamer--create-popup-msg commit-info t)))
     (overlay-put ov 'priority 65001)
     (overlay-put ov 'before-string
                  (propertize " " 'display `((margin right-margin) ,popup-msg)))
