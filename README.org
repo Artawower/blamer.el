@@ -120,6 +120,7 @@ Can accept
 - ='visual= - blamer will show info only about one line.
 - ='both= - works with both states.
 - ='overlay-popup= - nice overlay popup (see images/blamer-pretty-popup-dark.jpg)
+- ='margin-overlay= - show commit info in the margin
 - ='posframe-popup= - posframe popup (see images/posframe.png)
   *Warning* The 'overlay-popup feature highly dependent on you custom fonts, it may have worse alignment.
 **** Overlay popup position
