@@ -956,9 +956,10 @@ CALLBACK will be called with result."
         (apply #'vc-git--run-command-string ,file-name ',command))
      callback)))
 
-(defun blamer--render (&optional type)
+(defun blamer--render (&optional type explicit)
   "Render text about current line commit status.
-TYPE - is optional argument that can replace global `blamer-type' variable."
+TYPE - is optional argument that can replace global `blamer-type' variable.
+EXPLICIT - flag this rendering as interactive."
 
   (with-current-buffer (window-buffer (get-buffer-window))
     (save-restriction
@@ -986,12 +987,13 @@ TYPE - is optional argument that can replace global `blamer-type' variable."
           (blamer--get-async-blame-info
            file-name start-line-number end-line-number
            (lambda (commit-infos)
-             (blamer--handle-async-blame-info-result
-              commit-infos
-              current-buffer
-              start-line-number
-              include-avatar-p
-              type))))))))
+             (when (or explicit (buffer-local-value 'blamer-mode current-buffer))
+               (blamer--handle-async-blame-info-result
+                commit-infos
+                current-buffer
+                start-line-number
+                include-avatar-p
+                type)))))))))
 
 (defun blamer--handle-async-blame-info-result (commit-infos buffer start-line-number include-avatar-p &optional type)
   "Handle COMMIT-INFOS for BUFFER and START-LINE-NUMBER.
@@ -1209,7 +1211,7 @@ TYPE - optional parameter, by default will use `overlay-popup'."
   (interactive)
   (when (blamer--git-exist-p)
     (blamer--reset-state)
-    (blamer--render (or type 'overlay-popup))
+    (blamer--render (or type 'overlay-popup) t)
     (blamer--preserve-state)
     (add-hook 'post-command-hook #'blamer--reset-state-once nil t)))
 
@@ -1221,4 +1223,3 @@ TYPE - optional parameter, by default will use `overlay-popup'."
 
 (provide 'blamer)
 ;;; blamer.el ends here
-
