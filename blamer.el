@@ -4,7 +4,7 @@
 
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
-;; Package-Requires: ((emacs "27.1") (posframe "1.1.7"))
+;; Package-Requires: ((emacs "27.1") (posframe "1.1.7") (async "1.9.9"))
 ;; Version: 0.7.3
 
 ;; This program is free software; you can redistribute it and/or modify
@@ -34,6 +34,7 @@
 (require 'url)
 (require 'vc-git)
 (require 'seq)
+(require 'async)
 
 (eval-when-compile
   (require 'subr-x))
@@ -169,6 +170,11 @@ length."
   "Message for uncommitted lines."
   :group 'blamer
   :type 'string)
+
+(defcustom blamer-use-async nil
+  "When non-nil, use asynchronous Git operations."
+  :group 'blamer
+  :type 'boolean)
 
 (defcustom blamer-view 'overlay
   "View for commit message.  Can be \\=overlay and \\=overlay-right."
@@ -888,6 +894,48 @@ when not provided `blamer-type' will be used."
         ((eq (or type blamer-type) 'posframe-popup) (blamer--render-posframe-popup commit-info))
         (t (blamer--render-right-overlay commit-info))))
 
+(defun blamer--render-async (&optional type)
+  "Render text about current line commit status.
+TYPE - is optional argument that can replace global `blamer-type' variable."
+
+  (let ((buf (window-buffer (get-buffer-window))))
+    (with-current-buffer buf
+      (save-restriction
+        (widen)
+        (let* ((end-line-number (if (region-active-p)
+                                    (save-excursion
+                                      (goto-char (region-end))
+                                      (line-number-at-pos))
+                                  (line-number-at-pos)))
+               (start-line-number (if (region-active-p)
+                                      (save-excursion
+                                        (goto-char (region-beginning))
+                                        (line-number-at-pos))
+                                    (line-number-at-pos)))
+               (file-name (blamer--get-local-name (buffer-file-name)))
+               (include-avatar-p (member type '(posframe-popup overlay-popup)))
+               (blame-cmd (append blamer--git-blame-cmd
+                                  (list (format "%s,%s" start-line-number end-line-number))))
+               (file-rel-name (file-relative-name file-name))
+               (blame-cmd (append (list "git" "--no-pager") blame-cmd (list file-rel-name))))
+
+          (async-start
+           (lambda ()
+             (let ((blame-cmd-res (shell-command-to-string (string-join blame-cmd " "))))
+               (butlast (split-string blame-cmd-res "\n"))))
+           (lambda (blame-cmd-res)
+             (with-current-buffer buf
+               (blamer--clear-overlay)
+               (save-excursion
+                 (when (region-active-p)
+                   (goto-char (region-beginning)))
+
+                 (dolist (cmd-msg blame-cmd-res)
+                   (unless (blamer--git-cmd-error-p cmd-msg)
+                     (let ((commit-info (blamer--parse-line-info cmd-msg include-avatar-p)))
+                       (blamer--render-line-overlay commit-info type)
+                       (forward-line)))))))))))))
+
 (defun blamer--render (&optional type)
   "Render text about current line commit status.
 TYPE - is optional argument that can replace global `blamer-type' variable."
@@ -935,7 +983,9 @@ Optional TYPE argument will override global `blamer-type'."
                      (use-region-p))
                 long-region-p
                 blamer--block-render-p)
-      (blamer--render blamer-type))))
+      (if blamer-use-async
+          (blamer--render-async blamer-type)
+        (blamer--render blamer-type)))))
 
 (defun blamer--render-commit-info-with-delay ()
   "Render commit info with delay."
@@ -1066,7 +1116,9 @@ TYPE - optional parameter, by default will use `overlay-popup'."
   (interactive)
   (when (blamer--git-exist-p)
     (blamer--reset-state)
-    (blamer--render (or type 'overlay-popup))
+    (if blamer-use-async
+        (blamer--render-async (or type 'overlay-popup))
+      (blamer--render (or type 'overlay-popup)))
     (blamer--preserve-state)
     (add-hook 'post-command-hook #'blamer--reset-state-once nil t)))
 
