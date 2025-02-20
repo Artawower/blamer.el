@@ -35,6 +35,7 @@
 (require 'vc-git)
 (require 'seq)
 (require 'async)
+(require 'sideline)
 
 (eval-when-compile
   (require 'subr-x))
@@ -1224,6 +1225,24 @@ TYPE - optional parameter, by default will use `overlay-popup'."
   "Show commit info from git blame using posframe."
   (interactive)
   (blamer-show-commit-info 'posframe-popup))
+
+
+;;;###autoload
+(defun blamer-async-sideline-backend (command)
+  "Async backend provider for COMMAND in the `sideline' package."
+  (cl-case command
+    (`candidates (cons :async (lambda (callback &rest _)
+                                (blamer--get-async-blame-info
+                                 (blamer--get-local-name (buffer-file-name))
+                                 (line-number-at-pos)
+                                 (line-number-at-pos)
+                                 (lambda (raw-commit-info)
+                                   (blamer--async-parse-line-info
+                                    raw-commit-info
+                                    (lambda (commit-info)
+                                      (funcall callback (list (blamer--create-popup-msg commit-info))))
+                                    (line-number-at-pos)))))))))
+
 
 (provide 'blamer)
 ;;; blamer.el ends here
