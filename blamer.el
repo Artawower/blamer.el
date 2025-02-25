@@ -5,7 +5,7 @@
 ;; Author: Artur Yaroshenko <artawower@protonmail.com>
 ;; URL: https://github.com/artawower/blamer.el
 ;; Package-Requires: ((emacs "27.1") (posframe "1.1.7") (async "1.9.8"))
-;; Version: 0.9.4
+;; Version: 0.10.0
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -35,7 +35,6 @@
 (require 'vc-git)
 (require 'seq)
 (require 'async)
-(require 'sideline)
 
 (eval-when-compile
   (require 'subr-x))
@@ -60,7 +59,7 @@
 (defconst blamer--git-repo-cmd '("rev-parse" "--is-inside-work-tree")
   "Command for detect git repo.")
 
-(defconst blamer--git-blame-cmd '("blame"  "-L")
+(defconst blamer--git-blame-cmd '("blame" "--date=iso" "-L")
   "Command for get blame of current line.")
 
 (defconst blamer--git-commit-message '("log"  "-n1")
@@ -716,10 +715,11 @@ Works only for github right now."
                                         blamer-symbol-count-before-new-line))
     text))
 
-(defun blamer--create-popup-msg (commit-info &optional not-truncate-p)
+(defun blamer--create-popup-msg (commit-info &optional not-truncate-p offset)
   "Handle current COMMIT-INFO.
 Optional disable truncating with NOT-TRUNCATE-P."
-  (let* ((offset (max (- (or blamer-min-offset 0) (length (thing-at-point 'line))) 0))
+  (let* ((offset (or offset
+                     (max (- (or blamer-min-offset 0) (length (thing-at-point 'line))) 0)))
          (commit-author (plist-get commit-info :commit-author))
          (popup-message (blamer--format-commit-info (plist-get commit-info :commit-hash)
                                                     (plist-get commit-info :commit-message)
@@ -1240,7 +1240,7 @@ TYPE - optional parameter, by default will use `overlay-popup'."
                                    (blamer--async-parse-line-info
                                     raw-commit-info
                                     (lambda (commit-info)
-                                      (funcall callback (list (blamer--create-popup-msg commit-info))))
+                                      (funcall callback (list (blamer--create-popup-msg commit-info t 0))))
                                     (line-number-at-pos)))))))))
 
 
