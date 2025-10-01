@@ -59,7 +59,7 @@
 (defconst blamer--git-repo-cmd '("rev-parse" "--is-inside-work-tree")
   "Command for detect git repo.")
 
-(defconst blamer--git-blame-cmd '("blame"  "-L")
+(defconst blamer--git-blame-cmd '("blame" "--date=iso" "-L")
   "Command for get blame of current line.")
 
 (defconst blamer--git-commit-message '("log"  "-n1")
@@ -732,10 +732,11 @@ Works only for github right now."
                                         blamer-symbol-count-before-new-line))
     text))
 
-(defun blamer--create-popup-msg (commit-info &optional not-truncate-p)
+(defun blamer--create-popup-msg (commit-info &optional not-truncate-p offset)
   "Handle current COMMIT-INFO.
 Optional disable truncating with NOT-TRUNCATE-P."
-  (let* ((offset (max (- (or blamer-min-offset 0) (length (thing-at-point 'line))) 0))
+  (let* ((offset (or offset
+                     (max (- (or blamer-min-offset 0) (length (thing-at-point 'line))) 0)))
          (commit-author (plist-get commit-info :commit-author))
          (popup-message (blamer--format-commit-info (plist-get commit-info :commit-hash)
                                                     (plist-get commit-info :commit-message)
@@ -1257,6 +1258,24 @@ TYPE - optional parameter, by default will use `overlay-popup'."
   "Show commit info from git blame using posframe."
   (interactive)
   (blamer-show-commit-info 'posframe-popup))
+
+
+;;;###autoload
+(defun blamer-async-sideline-backend (command)
+  "Async backend provider for COMMAND in the `sideline' package."
+  (cl-case command
+    (`candidates (cons :async (lambda (callback &rest _)
+                                (blamer--get-async-blame-info
+                                 (blamer--get-local-name (buffer-file-name))
+                                 (line-number-at-pos)
+                                 (line-number-at-pos)
+                                 (lambda (raw-commit-info)
+                                   (blamer--async-parse-line-info
+                                    raw-commit-info
+                                    (lambda (commit-info)
+                                      (funcall callback (list (blamer--create-popup-msg commit-info t 0))))
+                                    (line-number-at-pos)))))))))
+
 
 (provide 'blamer)
 ;;; blamer.el ends here
