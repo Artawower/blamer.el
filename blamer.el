@@ -342,26 +342,33 @@ in the echo-area."
   :group 'blamer
   :type '(repeat symbol))
 
-(defvar blamer-idle-timer nil
+(defvar-local blamer--idle-timer nil
   "Current timer before commit info showing.")
 
-(defvar blamer--previous-line-number nil
+(defvar-local blamer--previous-line-number nil
   "Line number of previous popup.")
 
-(defvar blamer--previous-window-width nil
+(defvar-local blamer--previous-window-width nil
   "Previous window width.")
 
-(defvar blamer--previous-line-length nil
+(defvar-local blamer--previous-line-length nil
   "Current line number length for detect render function.")
 
-(defvar blamer--previous-point nil
+(defvar-local blamer--previous-point nil
   "Last preserved blamer point.")
 
-(defvar blamer--previous-region-active-p nil
+(defvar-local blamer--previous-region-active-p nil
   "Was previous state is active region?")
 
-(defvar blamer--overlays '()
+(defvar-local blamer--overlays '()
   "Current active overlays for git blame messages.")
+
+(defvar-local blamer--request-id 0
+  "Incrementing ID to track and cancel outdated async requests.")
+
+(defun blamer--inc-request-id ()
+  "Increment request ID to invalidate pending async requests."
+  (setq blamer--request-id (1+ blamer--request-id)))
 
 (defvar blamer--block-render-p nil
   "Lock rendering, useful for external packages.")
@@ -396,7 +403,7 @@ Will show the available `blamer-bindings'."
 
 ;;;###autoload
 (defun blamer--clear-overlay ()
-  "Clear last overlay."
+  "Clear last overlay and invalidate pending async requests."
   (dolist (ov blamer--overlays)
     (delete-overlay ov))
   (setq blamer--overlays '()))
@@ -973,14 +980,16 @@ Return list of strings."
 
 (defun blamer--render-line-overlay (commit-info buffer render-point &optional type)
   "Render COMMIT-INFO overlay by optional TYPE in the BUFFER at the RENDER-POINT.
-when not provided `blamer-type' will be used."
-  (with-current-buffer buffer
-    (save-excursion
-      (cond ((eq (or type blamer-type) 'overlay-popup) (blamer--render-overlay-popup commit-info))
-            ((eq (or type blamer-type) 'echo-area) (blamer--render-echo-area commit-info))
-            ((eq (or type blamer-type) 'posframe-popup) (blamer--render-posframe-popup commit-info))
-            ((eq (or type blamer-type) 'margin-overlay) (blamer--render-margin-overlay commit-info render-point))
-            (t (blamer--render-right-overlay commit-info render-point))))))
+when not provided `blamer-type' will be used.
+Does nothing if BUFFER is not alive or RENDER-POINT is nil."
+  (when (and (buffer-live-p buffer) render-point)
+    (with-current-buffer buffer
+      (save-excursion
+        (cond ((eq (or type blamer-type) 'overlay-popup) (blamer--render-overlay-popup commit-info))
+              ((eq (or type blamer-type) 'echo-area) (blamer--render-echo-area commit-info))
+              ((eq (or type blamer-type) 'posframe-popup) (blamer--render-posframe-popup commit-info))
+              ((eq (or type blamer-type) 'margin-overlay) (blamer--render-margin-overlay commit-info render-point))
+              (t (blamer--render-right-overlay commit-info render-point)))))))
 
 (defun blamer--get-async-blame-info (file-name start-line end-line callback)
   "Get blame info for FILE-NAME from START-LINE to END-LINE.
@@ -1015,7 +1024,8 @@ EXPLICIT - flag this rendering as interactive."
                                   (line-number-at-pos)))
              (file-name (blamer--get-local-name (buffer-file-name)))
              (include-avatar-p (member type '(posframe-popup overlay-popup)))
-             (current-buffer (current-buffer)))
+             (request-buffer (current-buffer))
+             (request-id (blamer--inc-request-id)))
 
         (blamer--clear-overlay)
 
@@ -1026,18 +1036,22 @@ EXPLICIT - flag this rendering as interactive."
           (blamer--get-async-blame-info
            file-name start-line-number end-line-number
            (lambda (commit-infos)
-             (when (or explicit (buffer-local-value 'blamer-mode current-buffer))
+             (when (and (buffer-live-p request-buffer)
+                        (eq request-id (buffer-local-value 'blamer--request-id request-buffer))
+                        (or explicit (buffer-local-value 'blamer-mode request-buffer)))
                (blamer--handle-async-blame-info-result
                 commit-infos
-                current-buffer
+                request-buffer
                 start-line-number
                 include-avatar-p
+                request-id
                 type)))))))))
 
-(defun blamer--handle-async-blame-info-result (commit-infos buffer start-line-number include-avatar-p &optional type)
+(defun blamer--handle-async-blame-info-result (commit-infos buffer start-line-number include-avatar-p request-id &optional type)
   "Handle COMMIT-INFOS for BUFFER and START-LINE-NUMBER.
 INCLUDE-AVATAR-P is optional argument that can replace
-global `blamer-show-avatar-p' variable
+global `blamer-show-avatar-p' variable.
+REQUEST-ID is used to check if this request is still valid.
 TYPE is optional view render type."
   (let* ((commit-infos (if commit-infos
                            (butlast (split-string commit-infos "\n"))
@@ -1049,11 +1063,13 @@ TYPE is optional view render type."
         (blamer--async-parse-line-info
          cmd-msg
          (lambda (commit-info)
-           (blamer--render-line-overlay
-            commit-info
-            buffer
-            (blamer--get-render-point buffer (plist-get commit-info :line-number))
-            type))
+           (when (and (buffer-live-p buffer)
+                      (eq request-id (buffer-local-value 'blamer--request-id buffer)))
+             (blamer--render-line-overlay
+              commit-info
+              buffer
+              (blamer--get-render-point buffer (plist-get commit-info :line-number))
+              type)))
          line-number
          include-avatar-p)
         (setq line-number (1+ line-number))))))
@@ -1073,12 +1089,16 @@ TYPE is optional view render type."
       (forward-line (- line-number current-line-number)))))
 
 (defun blamer--get-render-point (buffer line-number)
-  "Return render point by LINE-NUMBER from BUFFER."
-  (with-current-buffer buffer
-    (save-excursion
-      (blamer--goto-line line-number)
-      (end-of-line)
-      (point))))
+  "Return render point by LINE-NUMBER from BUFFER.
+Returns nil if LINE-NUMBER doesn't exist in buffer."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (save-excursion
+        (let ((max-line (line-number-at-pos (point-max))))
+          (when (<= line-number max-line)
+            (blamer--goto-line line-number)
+            (end-of-line)
+            (point)))))))
 
 (defun blamer--safety-render (&optional type)
   "Function for checking current active blamer type before rendering with delay.
@@ -1095,10 +1115,10 @@ Optional TYPE argument will override global `blamer-type'."
 
 (defun blamer--render-commit-info-with-delay ()
   "Render commit info with delay."
-  (when blamer-idle-timer
-    (cancel-timer blamer-idle-timer))
+  (when blamer--idle-timer
+    (cancel-timer blamer--idle-timer))
 
-  (setq blamer-idle-timer
+  (setq blamer--idle-timer
         (run-with-idle-timer (or blamer-idle-time 0) nil 'blamer--safety-render)))
 
 (defun blamer--preserve-state ()
@@ -1124,6 +1144,7 @@ LOCAL-TYPE is force replacement of current `blamer-type' for handle rendering."
          (type (or local-type blamer-type)))
 
     (when (and clear-overlays-p (not blamer--block-render-p))
+      (blamer--inc-request-id)
       (blamer--clear-overlay))
 
     (when (and (not long-region-p)
@@ -1139,6 +1160,7 @@ LOCAL-TYPE is force replacement of current `blamer-type' for handle rendering."
                    (not (eq blamer--previous-line-number (line-number-at-pos)))
                    (not (eq blamer--previous-line-length (length (thing-at-point 'line))))))
 
+      (blamer--inc-request-id)
       (blamer--clear-overlay)
       (blamer--render-commit-info-with-delay))
 
@@ -1146,15 +1168,16 @@ LOCAL-TYPE is force replacement of current `blamer-type' for handle rendering."
 
 (defun blamer--reset-state ()
   "Reset all state after blamer mode is disabled."
-  (if blamer-idle-timer
-      (cancel-timer blamer-idle-timer))
+  (when blamer--idle-timer
+    (cancel-timer blamer--idle-timer))
 
   (blamer--clear-overlay)
-  (setq blamer-idle-timer nil)
+  (blamer--inc-request-id)
+  (setq blamer--idle-timer nil)
   (setq blamer--previous-line-number nil)
   (setq blamer--previous-window-width nil)
   (setq blamer--previous-point nil)
-  (when (not (eq nil (get-buffer blamer--buffer-name)))
+  (when (get-buffer blamer--buffer-name)
     (posframe-hide blamer--buffer-name))
   (remove-hook 'post-command-hook #'blamer--try-render t)
   (remove-hook 'window-state-change-hook #'blamer--try-render t))
